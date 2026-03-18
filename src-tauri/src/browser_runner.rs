@@ -2157,14 +2157,6 @@ impl BrowserRunner {
       .find(|p| p.id.to_string() == profile_id)
       .ok_or_else(|| format!("Profile '{profile_id}' not found"))?;
 
-    if profile.is_cross_os() {
-      return Err(format!(
-        "Cannot open URL with profile '{}': this profile was created on {} and cannot be used on a different operating system",
-        profile.name,
-        profile.host_os.as_deref().unwrap_or("another OS"),
-      ));
-    }
-
     log::info!("Opening URL '{url}' with profile '{profile_id}'");
 
     // Use launch_or_open_url which handles both launching new instances and opening in existing ones
@@ -2192,14 +2184,6 @@ pub async fn launch_browser_profile(
     profile.name,
     profile.id
   );
-
-  if profile.is_cross_os() {
-    return Err(format!(
-      "Cannot launch profile '{}': this profile was created on {} and cannot be launched on a different operating system",
-      profile.name,
-      profile.host_os.as_deref().unwrap_or("another OS"),
-    ));
-  }
 
   // Team lock check: if profile is sync-enabled and user is on a team, acquire lock
   crate::team_lock::acquire_team_lock_if_needed(&profile).await?;
@@ -2510,14 +2494,6 @@ pub async fn launch_browser_profile_with_debugging(
   remote_debugging_port: Option<u16>,
   headless: bool,
 ) -> Result<BrowserProfile, String> {
-  if profile.is_cross_os() {
-    return Err(format!(
-      "Cannot launch profile '{}': this profile was created on {} and cannot be launched on a different operating system",
-      profile.name,
-      profile.host_os.as_deref().unwrap_or("another OS"),
-    ));
-  }
-
   let browser_runner = BrowserRunner::instance();
   browser_runner
     .launch_browser_with_debugging(app_handle, &profile, url, remote_debugging_port, headless)

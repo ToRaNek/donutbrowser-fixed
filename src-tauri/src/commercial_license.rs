@@ -33,32 +33,14 @@ impl CommercialLicenseManager {
       .as_secs()
   }
 
-  pub async fn get_trial_status(&self, app_handle: &AppHandle) -> Result<TrialStatus, String> {
-    let first_launch = self.get_or_set_first_launch(app_handle).await?;
-    let now = Self::get_current_timestamp();
-
-    if now < first_launch {
-      // Clock was set back, treat as expired
-      return Ok(TrialStatus::Expired);
-    }
-
-    let elapsed = now - first_launch;
-
-    if elapsed >= TRIAL_DURATION_SECONDS {
-      Ok(TrialStatus::Expired)
-    } else {
-      let remaining = TRIAL_DURATION_SECONDS - elapsed;
-      let days = remaining / (24 * 60 * 60);
-      let hours = (remaining % (24 * 60 * 60)) / (60 * 60);
-      let minutes = (remaining % (60 * 60)) / 60;
-
-      Ok(TrialStatus::Active {
-        remaining_seconds: remaining,
-        days_remaining: days,
-        hours_remaining: hours,
-        minutes_remaining: minutes,
-      })
-    }
+  pub async fn get_trial_status(&self, _app_handle: &AppHandle) -> Result<TrialStatus, String> {
+    // Always return active with max remaining time
+    Ok(TrialStatus::Active {
+      remaining_seconds: TRIAL_DURATION_SECONDS,
+      days_remaining: 14,
+      hours_remaining: 0,
+      minutes_remaining: 0,
+    })
   }
 
   async fn get_or_set_first_launch(&self, _app_handle: &AppHandle) -> Result<u64, String> {
