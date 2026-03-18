@@ -14,10 +14,22 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use url::Url;
+
+/// Set TCP keepalive on a TcpStream to prevent NAT/firewall timeouts on idle connections.
+fn set_tcp_keepalive(stream: &TcpStream) {
+  let socket = socket2::SockRef::from(stream);
+  let keepalive = socket2::TcpKeepalive::new()
+    .with_time(Duration::from_secs(30))
+    .with_interval(Duration::from_secs(10));
+  if let Err(e) = socket.set_tcp_keepalive(&keepalive) {
+    log::warn!("Failed to set TCP keepalive: {}", e);
+  }
+}
 
 enum CompiledRule {
   Regex(Regex),
@@ -367,19 +379,38 @@ async fn connect_via_socks(
     connect(&mut stream, target, auth_info).await?;
     Ok(stream)
   } else {
-    // SOCKS4 - simplified implementation
-    let ip: std::net::IpAddr = target_host.parse()?;
+    // SOCKS4/SOCKS4a implementation
+    // Try parsing as IP first; if it's a domain name, resolve it via DNS
+    let ipv4 = if let Ok(ip) = target_host.parse::<std::net::IpAddr>() {
+      match ip {
+        std::net::IpAddr::V4(v4) => v4,
+        std::net::IpAddr::V6(_) => {
+          return Err("SOCKS4 does not support IPv6".into());
+        }
+      }
+    } else {
+      // Resolve domain name to IPv4 address
+      let addrs: Vec<_> =
+        tokio::net::lookup_host(format!("{}:{}", target_host, target_port))
+          .await?
+          .collect();
+      addrs
+        .iter()
+        .find_map(|addr| match addr.ip() {
+          std::net::IpAddr::V4(v4) => Some(v4),
+          _ => None,
+        })
+        .ok_or_else(|| {
+          format!(
+            "Failed to resolve '{}' to an IPv4 address for SOCKS4",
+            target_host
+          )
+        })?
+    };
 
     let mut request = vec![0x04, 0x01]; // SOCKS4, CONNECT
     request.extend_from_slice(&target_port.to_be_bytes());
-    match ip {
-      std::net::IpAddr::V4(ipv4) => {
-        request.extend_from_slice(&ipv4.octets());
-      }
-      std::net::IpAddr::V6(_) => {
-        return Err("SOCKS4 does not support IPv6".into());
-      }
-    }
+    request.extend_from_slice(&ipv4.octets());
     request.push(0); // NULL terminator for userid
 
     stream.write_all(&request).await?;
@@ -388,7 +419,7 @@ async fn connect_via_socks(
     stream.read_exact(&mut response).await?;
 
     if response[1] != 0x5A {
-      return Err("SOCKS4 connection failed".into());
+      return Err(format!("SOCKS4 connection failed (code: 0x{:02X})", response[1]).into());
     }
 
     Ok(stream)
@@ -719,8 +750,8 @@ async fn handle_http(
     .map(|h| h.to_string())
     .unwrap_or_else(|| "unknown".to_string());
 
-  log::error!(
-    "DEBUG: Handling HTTP request: {} {} (host: {:?})",
+  log::debug!(
+    "Handling HTTP request: {} {} (host: {:?})",
     req.method(),
     req.uri(),
     req.uri().host()
@@ -743,16 +774,12 @@ async fn handle_http(
   }
 
   // Use reqwest for HTTP/HTTPS/SOCKS5 proxies
-  use reqwest::Client;
-
-  let client_builder = Client::builder();
   let client = if should_bypass {
-    client_builder.build().unwrap_or_default()
+    build_direct_client()
   } else if let Some(ref upstream) = upstream_url {
     if upstream == "DIRECT" {
-      client_builder.build().unwrap_or_default()
+      build_direct_client()
     } else {
-      // Build reqwest client with proxy
       match build_reqwest_client_with_proxy(upstream) {
         Ok(c) => c,
         Err(e) => {
@@ -767,7 +794,7 @@ async fn handle_http(
       }
     }
   } else {
-    client_builder.build().unwrap_or_default()
+    build_direct_client()
   };
 
   // Convert hyper request to reqwest request
@@ -854,25 +881,13 @@ fn build_reqwest_client_with_proxy(
 ) -> Result<reqwest::Client, Box<dyn std::error::Error>> {
   use reqwest::Proxy;
 
-  let client_builder = reqwest::Client::builder();
-
-  // Parse the upstream URL
   let url = Url::parse(upstream_url)?;
   let scheme = url.scheme();
 
   let proxy = match scheme {
-    "http" | "https" => {
-      // For HTTP/HTTPS proxies, reqwest handles them directly
-      // Note: HTTPS proxy URLs still use HTTP CONNECT method, reqwest handles TLS automatically
-      Proxy::http(upstream_url)?
-    }
-    "socks5" => {
-      // For SOCKS5, reqwest supports it directly
-      Proxy::all(upstream_url)?
-    }
+    "http" | "https" | "socks5" => Proxy::all(upstream_url)?,
     "socks4" => {
       // SOCKS4 is handled manually in handle_http_via_socks4
-      // This should not be reached, but return error as fallback
       return Err("SOCKS4 should be handled manually".into());
     }
     _ => {
@@ -880,11 +895,30 @@ fn build_reqwest_client_with_proxy(
     }
   };
 
-  Ok(client_builder.proxy(proxy).build()?)
+  Ok(
+    reqwest::Client::builder()
+      .proxy(proxy)
+      .connect_timeout(Duration::from_secs(10))
+      .timeout(Duration::from_secs(120))
+      .pool_max_idle_per_host(10)
+      .tcp_keepalive(Duration::from_secs(30))
+      .build()?,
+  )
+}
+
+/// Build a direct reqwest client (no proxy) with timeouts and pooling.
+fn build_direct_client() -> reqwest::Client {
+  reqwest::Client::builder()
+    .connect_timeout(Duration::from_secs(10))
+    .timeout(Duration::from_secs(120))
+    .pool_max_idle_per_host(10)
+    .tcp_keepalive(Duration::from_secs(30))
+    .build()
+    .unwrap_or_default()
 }
 
 pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::error::Error>> {
-  log::error!(
+  log::info!(
     "Proxy worker starting, looking for config id: {}",
     config.id
   );
@@ -898,7 +932,7 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
     }
   };
 
-  log::error!(
+  log::info!(
     "Found config: id={}, port={:?}, upstream={}, profile_id={:?}",
     config.id,
     config.local_port,
@@ -906,12 +940,12 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
     config.profile_id
   );
 
-  log::error!("Starting proxy server for config id: {}", config.id);
+  log::info!("Starting proxy server for config id: {}", config.id);
 
   // Initialize traffic tracker with profile ID if available
   // This can now be called multiple times to update the tracker
   init_traffic_tracker(config.id.clone(), config.profile_id.clone());
-  log::error!(
+  log::info!(
     "Traffic tracker initialized for proxy: {} (profile_id: {:?})",
     config.id,
     config.profile_id
@@ -919,25 +953,25 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
 
   // Verify tracker was initialized correctly
   if let Some(tracker) = crate::traffic_stats::get_traffic_tracker() {
-    log::error!(
+    log::info!(
       "Tracker verified: proxy_id={}, profile_id={:?}",
       tracker.proxy_id,
       tracker.profile_id
     );
   } else {
-    log::error!("WARNING: Tracker was not initialized!");
+    log::warn!("Tracker was not initialized!");
   }
 
   // Determine the bind address
   let bind_addr = SocketAddr::from(([127, 0, 0, 1], config.local_port.unwrap_or(0)));
 
-  log::error!("Attempting to bind proxy server to {}", bind_addr);
+  log::info!("Attempting to bind proxy server to {}", bind_addr);
 
   // Bind to the port
   let listener = TcpListener::bind(bind_addr).await?;
   let actual_port = listener.local_addr()?.port();
 
-  log::error!("Successfully bound to port {}", actual_port);
+  log::info!("Successfully bound to port {}", actual_port);
 
   // Update config with actual port and local_url
   let mut updated_config = config.clone();
@@ -945,7 +979,7 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
   updated_config.local_url = Some(format!("http://127.0.0.1:{}", actual_port));
 
   // Save the updated config
-  log::error!(
+  log::info!(
     "Saving updated config with local_url={:?}",
     updated_config.local_url
   );
@@ -960,12 +994,12 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
     Some(updated_config.upstream_url.clone())
   };
 
-  log::error!("Proxy server bound to 127.0.0.1:{}", actual_port);
-  log::error!(
+  log::info!("Proxy server bound to 127.0.0.1:{}", actual_port);
+  log::info!(
     "Proxy server listening on 127.0.0.1:{} (ready to accept connections)",
     actual_port
   );
-  log::error!("Proxy server entering accept loop - process should stay alive");
+  log::info!("Proxy server entering accept loop - process should stay alive");
 
   // Start a background task to write lightweight session snapshots for real-time updates
   // These are much smaller than full stats and can be written frequently (~100 bytes every 2 seconds)
@@ -1056,7 +1090,7 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
         // Enable TCP_NODELAY to ensure small packets are sent immediately
         // This is critical for CONNECT responses to be sent before tunneling begins
         let _ = stream.set_nodelay(true);
-        log::error!("DEBUG: Accepted connection from {:?}", peer_addr);
+        log::debug!(" Accepted connection from {:?}", peer_addr);
 
         let upstream = upstream_url.clone();
         let matcher = bypass_matcher.clone();
@@ -1100,7 +1134,7 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
 
                 loop {
                   if reads >= max_reads {
-                    log::error!("DEBUG: Max reads reached, breaking");
+                    log::debug!(" Max reads reached, breaking");
                     break;
                   }
 
@@ -1141,7 +1175,7 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
                       }
                     }
                     Err(e) => {
-                      log::error!("DEBUG: Error reading CONNECT request: {:?}", e);
+                      log::debug!(" Error reading CONNECT request: {:?}", e);
                       // If we have some data, try to process it
                       if total_read > 0 {
                         break;
@@ -1161,7 +1195,7 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<(), Box<dyn std::er
                 {
                   log::error!("Error handling CONNECT request: {:?}", e);
                 } else {
-                  log::error!("DEBUG: CONNECT handled successfully");
+                  log::debug!(" CONNECT handled successfully");
                 }
                 return;
               }
@@ -1336,6 +1370,10 @@ async fn handle_connect_from_buffer(
   // Enable TCP_NODELAY on target stream for immediate data transfer
   let _ = target_stream.set_nodelay(true);
 
+  // Set TCP keepalive on both streams to prevent NAT/firewall idle connection drops
+  set_tcp_keepalive(&client_stream);
+  set_tcp_keepalive(&target_stream);
+
   // Send 200 Connection Established response to client
   // CRITICAL: Must flush after writing to ensure response is sent before tunneling
   client_stream
@@ -1343,7 +1381,7 @@ async fn handle_connect_from_buffer(
     .await?;
   client_stream.flush().await?;
 
-  log::error!("DEBUG: Sent 200 Connection Established response, starting tunnel");
+  log::debug!("Sent 200 Connection Established response, starting tunnel");
 
   // Now tunnel data bidirectionally with counting
   // Wrap streams to count bytes transferred
@@ -1360,14 +1398,14 @@ async fn handle_connect_from_buffer(
   let (mut client_read, mut client_write) = tokio::io::split(counting_client);
   let (mut target_read, mut target_write) = tokio::io::split(counting_target);
 
-  log::error!("DEBUG: Starting bidirectional tunnel");
+  log::debug!(" Starting bidirectional tunnel");
 
   // Spawn two tasks to forward data in both directions
   let client_to_target = tokio::spawn(async move {
     let result = tokio::io::copy(&mut client_read, &mut target_write).await;
     match result {
       Ok(bytes) => {
-        log::error!("DEBUG: Tunneled {} bytes from client->target", bytes);
+        log::debug!(" Tunneled {} bytes from client->target", bytes);
       }
       Err(e) => {
         log::error!("Error forwarding client->target: {:?}", e);
@@ -1379,7 +1417,7 @@ async fn handle_connect_from_buffer(
     let result = tokio::io::copy(&mut target_read, &mut client_write).await;
     match result {
       Ok(bytes) => {
-        log::error!("DEBUG: Tunneled {} bytes from target->client", bytes);
+        log::debug!(" Tunneled {} bytes from target->client", bytes);
       }
       Err(e) => {
         log::error!("Error forwarding target->client: {:?}", e);
@@ -1390,10 +1428,10 @@ async fn handle_connect_from_buffer(
   // Wait for either direction to finish (connection closed)
   tokio::select! {
     _ = client_to_target => {
-      log::error!("DEBUG: Client->target tunnel closed");
+      log::debug!(" Client->target tunnel closed");
     }
     _ = target_to_client => {
-      log::error!("DEBUG: Target->client tunnel closed");
+      log::debug!(" Target->client tunnel closed");
     }
   }
 
