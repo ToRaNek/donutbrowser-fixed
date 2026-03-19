@@ -1,46 +1,43 @@
 <div align="center">
   <img src="assets/logo.png" alt="Donut Browser Logo" width="150">
-  <h1>Donut Browser</h1>
-  <strong>A powerful anti-detect browser that puts you in control of your browsing experience. 🍩</strong>
+  <h1>Donut Browser (Fixed)</h1>
+  <strong>Anti-detect browser with proxy fixes, cross-OS fingerprints unlocked, and all features enabled.</strong>
 </div>
 <br>
 
 <p align="center">
-  <a style="text-decoration: none;" href="https://github.com/zhom/donutbrowser/releases/latest" target="_blank"><img alt="GitHub release" src="https://img.shields.io/github/v/release/zhom/donutbrowser">
-  </a>
-  <a style="text-decoration: none;" href="https://github.com/zhom/donutbrowser/issues" target="_blank">
-    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs Welcome">
-  </a>
-  <a style="text-decoration: none;" href="https://github.com/zhom/donutbrowser/blob/main/LICENSE" target="_blank">
-    <img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License">
-  </a>
-  <a href="https://app.codacy.com/gh/zhom/donutbrowser/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade">
-    <img src="https://app.codacy.com/project/badge/Grade/b9c9beafc92d4bc8bc7c5b42c6c4ba81"/>
-  </a>
-  <a href="https://app.fossa.com/projects/git%2Bgithub.com%2Fzhom%2Fdonutbrowser?ref=badge_shield&issueType=security" alt="FOSSA Status">
-    <img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2Fzhom%2Fdonutbrowser.svg?type=shield&issueType=security"/>
-  </a>
-  <a style="text-decoration: none;" href="https://github.com/zhom/donutbrowser/stargazers" target="_blank">
-    <img src="https://img.shields.io/github/stars/zhom/donutbrowser?style=social" alt="GitHub stars">
-  </a>
+  <a href="https://github.com/ToRaNek/donutbrowser-fixed/releases/latest"><img alt="GitHub release" src="https://img.shields.io/github/v/release/ToRaNek/donutbrowser-fixed"></a>
+  <a href="https://github.com/ToRaNek/donutbrowser-fixed/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License"></a>
 </p>
-
-<img alt="Donut Browser Preview" src="assets/donut-preview.png" />
-
-## Features
-
-- Create unlimited number of local browser profiles completely isolated from each other
-- Safely use multiple accounts on one device by using anti-detect browser profiles, powered by [Camoufox](https://camoufox.com)
-- Proxy support with basic auth for all browsers
-- Import profiles from your existing browsers
-- Automatic updates for browsers
-- Set Donut Browser as your default browser to control in which profile to open links
 
 ## Download
 
-> For Linux, .deb and .rpm packages are available as well as standalone .AppImage files.
+Choose the right file for your system:
 
-The app can be downloaded from the [releases page](https://github.com/zhom/donutbrowser/releases/latest).
+### Windows
+
+| File | Description |
+|---|---|
+| [Donut_x64-setup.exe](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.17.4_x64-setup.exe) | Windows installer (x64) |
+
+### macOS
+
+| File | Description |
+|---|---|
+| [Donut_aarch64.dmg](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.17.4_aarch64.dmg) | macOS Apple Silicon (M1/M2/M3/M4) |
+| [Donut_x64.dmg](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.17.4_x64.dmg) | macOS Intel |
+
+> **Which macOS version?** If your Mac is from 2020 or later, use **aarch64** (Apple Silicon). Older Macs use **x64** (Intel).
+
+### Linux
+
+| File | Description |
+|---|---|
+| [Donut_amd64.deb](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.17.4_amd64.deb) | Debian / Ubuntu / Mint |
+| [Donut_x86_64.rpm](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut-0.17.4-1.x86_64.rpm) | Fedora / RHEL / openSUSE |
+| [Donut_amd64.AppImage](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.17.4_amd64.AppImage) | Universal (any distro) |
+
+> **Which Linux version?** Use **.deb** for Ubuntu/Debian, **.rpm** for Fedora/RHEL, or **.AppImage** if unsure (works everywhere).
 
 <details>
 <summary>Troubleshooting AppImage on Linux</summary>
@@ -48,93 +45,44 @@ The app can be downloaded from the [releases page](https://github.com/zhom/donut
 If the AppImage segfaults on launch, install **libfuse2** (`sudo apt install libfuse2` / `yay -S libfuse2` / `sudo dnf install fuse-libs`), or bypass FUSE entirely:
 
 ```bash
-APPIMAGE_EXTRACT_AND_RUN=1 ./Donut.Browser_x.x.x_amd64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./Donut_0.17.4_amd64.AppImage
 ```
 
 If that gives an EGL display error, try adding `WEBKIT_DISABLE_DMABUF_RENDERER=1` or `GDK_BACKEND=x11` to the command above. If issues persist, the **.deb** / **.rpm** packages are a more reliable alternative.
 
 </details>
 
-<!-- ## Supported Platforms
+## What's different from the original Donut Browser?
 
-- ✅ **macOS** (Apple Silicon)
-- ✅ **Linux** (x64)
-- ✅ **Windows** (x64) -->
+This fork is based on [zhom/donutbrowser](https://github.com/zhom/donutbrowser) with the following fixes:
 
-## Development
+### Proxy fixes
+- **HTTPS traffic now actually routed through proxy** (was going direct due to `Proxy::http()` instead of `Proxy::all()`)
+- **TCP keepalive (30s)** on tunnel connections to prevent NAT/firewall idle drops
+- **Connect timeout (10s) + request timeout (120s)** to prevent hanging connections
+- **SOCKS4 domain name resolution** fixed (was failing on non-IP hostnames)
+- **Connection pooling** with TCP keepalive on reqwest clients
 
-### Contributing
+### Unlocked features
+- **Cross-OS fingerprints**: Generate Windows/macOS fingerprints from Linux (and vice versa)
+- **All pro features enabled**: Extensions, cookie copy, synchronizer, advanced fingerprint editing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+### Other
+- Debug logging cleaned up (`log::error!` spam reduced to `log::debug!`)
 
-## Issues
+## Features
 
-If you face any problems while using the application, please [open an issue](https://github.com/zhom/donutbrowser/issues).
-
-## Self-Hosting Sync
-
-Donut Browser supports syncing profiles, proxies, and groups across devices via a self-hosted sync server. See the [Self-Hosting Guide](docs/self-hosting-donut-sync.md) for Docker-based setup instructions.
-
-## Community
-
-Have questions or want to contribute? The team would love to hear from you!
-
-- **Issues**: [GitHub Issues](https://github.com/zhom/donutbrowser/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/zhom/donutbrowser/discussions)
-
-## Star History
-
-<a href="https://www.star-history.com/#zhom/donutbrowser&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=zhom/donutbrowser&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=zhom/donutbrowser&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=zhom/donutbrowser&type=Date" />
- </picture>
-</a>
-
-## Contributors
-
-<!-- readme: collaborators,contributors -start -->
-<table>
-	<tbody>
-		<tr>
-            <td align="center">
-                <a href="https://github.com/ToRaNek">
-                    <img src="https://avatars.githubusercontent.com/u/64385066?v=4" width="100;" alt="ToRaNek"/>
-                    <br />
-                    <sub><b>Gordon</b></sub>
-                </a>
-            </td>
-            <td align="center">
-                <a href="https://github.com/zhom">
-                    <img src="https://avatars.githubusercontent.com/u/2717306?v=4" width="100;" alt="zhom"/>
-                    <br />
-                    <sub><b>zhom</b></sub>
-                </a>
-            </td>
-            <td align="center">
-                <a href="https://github.com/HassiyYT">
-                    <img src="https://avatars.githubusercontent.com/u/81773493?v=4" width="100;" alt="HassiyYT"/>
-                    <br />
-                    <sub><b>Hassiy</b></sub>
-                </a>
-            </td>
-            <td align="center">
-                <a href="https://github.com/JorySeverijnse">
-                    <img src="https://avatars.githubusercontent.com/u/117462355?v=4" width="100;" alt="JorySeverijnse"/>
-                    <br />
-                    <sub><b>Jory Severijnse</b></sub>
-                </a>
-            </td>
-		</tr>
-	<tbody>
-</table>
-<!-- readme: collaborators,contributors -end -->
-
-## Contact
-
-Have an urgent question or want to report a security vulnerability? Send an email to [contact@donutbrowser.com](mailto:contact@donutbrowser.com) and the team will get back to you as fast as possible.
+- Unlimited isolated browser profiles with anti-detect fingerprints, powered by [Camoufox](https://camoufox.com)
+- Cross-OS fingerprint generation (Windows, macOS, Linux)
+- Proxy support per profile (HTTP, HTTPS, SOCKS4, SOCKS5) with authentication
+- Cookie import/export (JSON + Netscape format)
+- REST API for automation (Puppeteer, Playwright, Selenium compatible)
+- VPN support (OpenVPN, WireGuard)
+- Extension management
+- Profile import from existing browsers
 
 ## License
 
-This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+AGPL-3.0 - see [LICENSE](LICENSE).
+
+Based on [Donut Browser](https://github.com/zhom/donutbrowser) by zhom.
