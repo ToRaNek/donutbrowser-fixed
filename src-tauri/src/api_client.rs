@@ -347,13 +347,6 @@ pub struct BrowserRelease {
   pub is_prerelease: bool,
 }
 
-/// Wayfern version info from https://donutbrowser.com/wayfern.json
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WayfernVersionInfo {
-  pub version: String,
-  pub downloads: HashMap<String, Option<String>>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 struct CachedVersionData {
   releases: Vec<BrowserRelease>,
@@ -363,12 +356,6 @@ struct CachedVersionData {
 #[derive(Debug, Serialize, Deserialize)]
 struct CachedGithubData {
   releases: Vec<GithubRelease>,
-  timestamp: u64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct CachedWayfernData {
-  version_info: WayfernVersionInfo,
   timestamp: u64,
 }
 
@@ -1089,122 +1076,85 @@ impl ApiClient {
     Ok(compatible_releases)
   }
 
-  fn load_cached_wayfern_version(&self) -> Option<WayfernVersionInfo> {
-    let cache_dir = Self::get_cache_dir().ok()?;
-    let cache_file = cache_dir.join("wayfern_version.json");
-
-    if !cache_file.exists() {
-      return None;
+  /// Check if a fingerprint-chromium (Wayfern) release has compatible assets for the given platform and architecture
+  fn has_compatible_wayfern_asset(
+    assets: &[crate::browser::GithubAsset],
+    os: &str,
+    arch: &str,
+  ) -> bool {
+    match (os, arch) {
+      ("linux", "x64") => assets.iter().any(|asset| {
+        let name = asset.name.to_lowercase();
+        name.starts_with("ungoogled-chromium") && name.contains("x86_64") && name.ends_with("_linux.tar.xz")
+      }),
+      ("windows", "x64") => assets.iter().any(|asset| {
+        let name = asset.name.to_lowercase();
+        name.starts_with("ungoogled-chromium") && name.contains("windows") && name.ends_with(".zip")
+      }),
+      ("macos", "x64") | ("macos", "arm64") => assets.iter().any(|asset| {
+        let name = asset.name.to_lowercase();
+        name.starts_with("ungoogled-chromium") && name.contains("macos") && name.ends_with(".dmg")
+      }),
+      _ => false,
     }
-
-    let content = fs::read_to_string(&cache_file).ok()?;
-    let cached_data: CachedWayfernData = serde_json::from_str(&content).ok()?;
-
-    // Always use cached Wayfern version - cache never expires, only gets updated
-    Some(cached_data.version_info)
   }
 
-  fn save_cached_wayfern_version(
-    &self,
-    version_info: &WayfernVersionInfo,
-  ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let cache_dir = Self::get_cache_dir()?;
-    let cache_file = cache_dir.join("wayfern_version.json");
-
-    let cached_data = CachedWayfernData {
-      version_info: version_info.clone(),
-      timestamp: Self::get_current_timestamp(),
-    };
-
-    let content = serde_json::to_string_pretty(&cached_data)?;
-    fs::write(&cache_file, content)?;
-    log::info!("Cached Wayfern version: {}", version_info.version);
-    Ok(())
-  }
-
-  /// Fetch Wayfern version info from https://donutbrowser.com/wayfern.json
-  pub async fn fetch_wayfern_version_with_caching(
+  pub async fn fetch_wayfern_releases_with_caching(
     &self,
     no_caching: bool,
-  ) -> Result<WayfernVersionInfo, Box<dyn std::error::Error + Send + Sync>> {
+  ) -> Result<Vec<GithubRelease>, Box<dyn std::error::Error + Send + Sync>> {
     // Check cache first (unless bypassing)
     if !no_caching {
-      if let Some(cached_version) = self.load_cached_wayfern_version() {
-        log::info!("Using cached Wayfern version: {}", cached_version.version);
-        return Ok(cached_version);
+      if let Some(cached_releases) = self.load_cached_github_releases("wayfern") {
+        log::info!(
+          "Using cached Wayfern releases, count: {}",
+          cached_releases.len()
+        );
+        return Ok(cached_releases);
       }
     }
 
-    log::info!("Fetching Wayfern version from https://donutbrowser.com/wayfern.json");
-    let url = "https://donutbrowser.com/wayfern.json";
+    log::info!("Fetching fingerprint-chromium releases from GitHub API");
+    let base_url = format!(
+      "{}/repos/adryfish/fingerprint-chromium/releases",
+      self.github_api_base
+    );
+    let releases: Vec<GithubRelease> =
+      self.fetch_github_releases_multiple_pages(&base_url).await?;
 
-    let mut last_err = None;
-    let mut version_info: Option<WayfernVersionInfo> = None;
+    log::info!(
+      "Fetched {} total fingerprint-chromium releases from GitHub",
+      releases.len()
+    );
 
-    for attempt in 1..=3 {
-      match self
-        .client
-        .get(url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36")
-        .send()
-        .await
-      {
-        Ok(response) => {
-          if !response.status().is_success() {
-            last_err = Some(format!("HTTP {}", response.status()));
-          } else {
-            match response.json::<WayfernVersionInfo>().await {
-              Ok(info) => {
-                version_info = Some(info);
-                break;
-              }
-              Err(e) => last_err = Some(format!("Failed to parse response: {e}")),
-            }
-          }
-        }
-        Err(e) => {
-          log::warn!("Wayfern fetch attempt {attempt}/3 failed: {e}");
-          last_err = Some(e.to_string());
-        }
-      }
+    // Get platform info to filter appropriate releases
+    let (os, arch) = Self::get_platform_info();
+    log::info!("Filtering for platform: {os}/{arch}");
 
-      if attempt < 3 {
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-      }
-    }
+    // Filter releases that have assets compatible with the current platform
+    let mut compatible_releases: Vec<GithubRelease> = releases
+      .into_iter()
+      .filter(|release| Self::has_compatible_wayfern_asset(&release.assets, &os, &arch))
+      .collect();
 
-    let version_info = version_info.ok_or_else(|| {
-      format!(
-        "Failed to fetch Wayfern version after 3 attempts: {}",
-        last_err.unwrap_or_default()
-      )
-    })?;
-    log::info!("Fetched Wayfern version: {}", version_info.version);
+    log::info!(
+      "After platform filtering: {} compatible releases",
+      compatible_releases.len()
+    );
+
+    // Sort by version (latest first)
+    sort_github_releases(&mut compatible_releases);
 
     // Cache the results (unless bypassing cache)
     if !no_caching {
-      if let Err(e) = self.save_cached_wayfern_version(&version_info) {
-        log::error!("Failed to cache Wayfern version: {e}");
+      if let Err(e) = self.save_cached_github_releases("wayfern", &compatible_releases) {
+        log::error!("Failed to cache Wayfern releases: {e}");
+      } else {
+        log::info!("Cached {} Wayfern releases", compatible_releases.len());
       }
     }
 
-    Ok(version_info)
-  }
-
-  /// Get the download URL for Wayfern based on current platform
-  pub fn get_wayfern_download_url(&self, version_info: &WayfernVersionInfo) -> Option<String> {
-    let (os, arch) = Self::get_platform_info();
-    let platform_key = format!("{os}-{arch}");
-
-    version_info
-      .downloads
-      .get(&platform_key)
-      .and_then(|url| url.clone())
-  }
-
-  /// Check if Wayfern has a compatible download for current platform
-  pub fn has_wayfern_compatible_download(&self, version_info: &WayfernVersionInfo) -> bool {
-    self.get_wayfern_download_url(version_info).is_some()
+    Ok(compatible_releases)
   }
 
   /// Check if a Zen twilight release has been updated by comparing file size

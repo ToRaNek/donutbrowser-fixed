@@ -75,19 +75,10 @@ impl BrowserVersionManager {
         Ok(true)
       }
       "wayfern" => {
-        // Wayfern support depends on version.json downloads availability
-        // Currently supports macos-arm64 and linux-x64
-        let platform_key = format!("{os}-{arch}");
-        // Check dynamically, but allow the browser to appear even if platform not available yet
-        // The actual download will fail gracefully if not supported
+        // fingerprint-chromium supports Linux x64, Windows x64, and macOS (universal)
         Ok(matches!(
-          platform_key.as_str(),
-          "macos-arm64"
-            | "linux-x64"
-            | "macos-x64"
-            | "linux-arm64"
-            | "windows-x64"
-            | "windows-arm64"
+          (&os[..], &arch[..]),
+          ("linux", "x64") | ("windows", "x64") | ("macos", "x64") | ("macos", "arm64")
         ))
       }
       _ => Err(format!("Unknown browser: {browser}").into()),
@@ -115,10 +106,10 @@ impl BrowserVersionManager {
 
   /// Get cached browser versions immediately (returns None if no cache exists)
   pub fn get_cached_browser_versions(&self, browser: &str) -> Option<Vec<String>> {
-    if browser == "brave" {
+    if browser == "brave" || browser == "wayfern" {
       return self
         .api_client
-        .get_cached_github_releases("brave")
+        .get_cached_github_releases(browser)
         .map(|releases| releases.into_iter().map(|r| r.tag_name).collect());
     }
 
@@ -262,7 +253,8 @@ impl BrowserVersionManager {
     crate::api_client::sort_versions(&mut merged_versions);
 
     // Save the merged cache (unless explicitly bypassing cache)
-    if !no_caching && browser != "brave" {
+    // Skip for browsers that use GitHub releases caching (brave, wayfern)
+    if !no_caching && browser != "brave" && browser != "wayfern" {
       let merged_releases: Vec<BrowserRelease> = merged_versions
         .iter()
         .map(|v| BrowserRelease {
@@ -443,13 +435,23 @@ impl BrowserVersionManager {
           .collect()
       }
       "wayfern" => {
-        // Wayfern only has one version from version.json
+        let releases = self.fetch_wayfern_releases_detailed(true).await?;
         merged_versions
           .into_iter()
-          .map(|version| BrowserVersionInfo {
-            version: version.clone(),
-            is_prerelease: false, // Wayfern releases are always stable
-            date: "".to_string(),
+          .map(|version| {
+            if let Some(release) = releases.iter().find(|r| r.tag_name == version) {
+              BrowserVersionInfo {
+                version: release.tag_name.clone(),
+                is_prerelease: release.is_nightly,
+                date: release.published_at.clone(),
+              }
+            } else {
+              BrowserVersionInfo {
+                version: version.clone(),
+                is_prerelease: false,
+                date: "".to_string(),
+              }
+            }
           })
           .collect()
       }
@@ -677,15 +679,15 @@ impl BrowserVersionManager {
         })
       }
       "wayfern" => {
-        // Wayfern downloads from https://download.wayfern.com/
-        // File naming: wayfern-{chromium_version}-{platform}-{arch}.{ext}
-        // Platform/arch format: linux-x64, macos-arm64, etc.
-        let platform_key = format!("{os}-{arch}");
-        let (filename, is_archive) = match platform_key.as_str() {
-          "macos-arm64" | "macos-x64" => (format!("wayfern-{version}-{platform_key}.dmg"), true),
-          "linux-x64" | "linux-arm64" => (format!("wayfern-{version}-{platform_key}.tar.xz"), true),
-          "windows-x64" | "windows-arm64" => {
-            (format!("wayfern-{version}-{platform_key}.zip"), true)
+        // fingerprint-chromium downloads from GitHub releases
+        // Asset naming: ungoogled-chromium-VERSION-1-x86_64_linux.tar.xz (Linux)
+        //               ungoogled-chromium_VERSION-1.1_windows_x64.zip (Windows)
+        //               ungoogled-chromium_VERSION-1.1_macos.dmg (macOS)
+        let (filename, is_archive) = match (&os[..], &arch[..]) {
+          ("linux", "x64") => (format!("ungoogled-chromium-{version}-linux-x64.tar.xz"), true),
+          ("windows", "x64") => (format!("ungoogled-chromium-{version}-windows-x64.zip"), true),
+          ("macos", "x64") | ("macos", "arm64") => {
+            (format!("ungoogled-chromium-{version}-macos.dmg"), true)
           }
           _ => {
             return Err(
@@ -694,9 +696,11 @@ impl BrowserVersionManager {
           }
         };
 
-        // Note: The actual URL will be resolved dynamically from version.json in downloader.rs
+        // Note: The actual URL will be resolved dynamically from GitHub releases in downloader.rs
         Ok(DownloadInfo {
-          url: format!("https://download.wayfern.com/{filename}"),
+          url: format!(
+            "https://github.com/adryfish/fingerprint-chromium/releases/download/{version}/{filename}"
+          ),
           filename,
           is_archive,
         })
@@ -879,21 +883,18 @@ impl BrowserVersionManager {
     &self,
     no_caching: bool,
   ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-    let version_info = self
-      .api_client
-      .fetch_wayfern_version_with_caching(no_caching)
-      .await?;
+    let releases = self.fetch_wayfern_releases_detailed(no_caching).await?;
+    Ok(releases.into_iter().map(|r| r.tag_name).collect())
+  }
 
-    // Check if current platform has a download available
-    if self
+  async fn fetch_wayfern_releases_detailed(
+    &self,
+    no_caching: bool,
+  ) -> Result<Vec<GithubRelease>, Box<dyn std::error::Error + Send + Sync>> {
+    self
       .api_client
-      .has_wayfern_compatible_download(&version_info)
-    {
-      Ok(vec![version_info.version])
-    } else {
-      // No compatible download for current platform
-      Ok(vec![])
-    }
+      .fetch_wayfern_releases_with_caching(no_caching)
+      .await
   }
 }
 

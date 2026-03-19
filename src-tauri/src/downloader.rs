@@ -143,37 +143,34 @@ impl Downloader {
         Ok(asset_url)
       }
       BrowserType::Wayfern => {
-        // For Wayfern, get the download URL from version.json
-        let version_info = self
+        // For Wayfern (fingerprint-chromium), find the asset from GitHub releases
+        let releases = self
           .api_client
-          .fetch_wayfern_version_with_caching(true)
+          .fetch_wayfern_releases_with_caching(true)
           .await?;
 
-        if version_info.version != version {
-          log::info!(
-            "Wayfern: requested version {version}, using available version {}",
-            version_info.version
-          );
-        }
+        let release = releases
+          .iter()
+          .find(|r| r.tag_name == version)
+          .or_else(|| {
+            log::info!(
+              "Wayfern: requested version {version} not found, using latest available"
+            );
+            releases.first()
+          })
+          .ok_or("No fingerprint-chromium releases found".to_string())?;
 
-        // Get the download URL for current platform
-        let download_url = self
-          .api_client
-          .get_wayfern_download_url(&version_info)
-          .ok_or_else(|| {
-            let (os, arch) = Self::get_platform_info();
-            format!(
-              "No compatible download found for Wayfern on {os}/{arch}. Available platforms: {}",
-              version_info
-                .downloads
-                .iter()
-                .filter_map(|(k, v)| if v.is_some() { Some(k.as_str()) } else { None })
-                .collect::<Vec<_>>()
-                .join(", ")
-            )
-          })?;
+        // Get platform and architecture info
+        let (os, arch) = Self::get_platform_info();
 
-        Ok(download_url)
+        // Find the appropriate asset
+        let asset_url = self
+          .find_wayfern_asset(&release.assets, &os, &arch)
+          .ok_or(format!(
+            "No compatible asset found for Wayfern version {version} on {os}/{arch}"
+          ))?;
+
+        Ok(asset_url)
       }
     }
   }
@@ -242,6 +239,54 @@ impl Downloader {
         os,
         arch,
         pattern,
+        assets.iter().map(|a| &a.name).collect::<Vec<_>>()
+      );
+      None
+    }
+  }
+
+  /// Find the appropriate fingerprint-chromium (Wayfern) asset for the current platform and architecture
+  fn find_wayfern_asset(
+    &self,
+    assets: &[crate::browser::GithubAsset],
+    os: &str,
+    arch: &str,
+  ) -> Option<String> {
+    let asset = match (os, arch) {
+      ("linux", "x64") => assets.iter().find(|asset| {
+        let name = asset.name.to_lowercase();
+        name.starts_with("ungoogled-chromium")
+          && name.contains("x86_64")
+          && name.ends_with("_linux.tar.xz")
+      }),
+      ("windows", "x64") => assets.iter().find(|asset| {
+        let name = asset.name.to_lowercase();
+        name.starts_with("ungoogled-chromium")
+          && name.contains("windows")
+          && name.ends_with(".zip")
+      }),
+      ("macos", "x64") | ("macos", "arm64") => assets.iter().find(|asset| {
+        let name = asset.name.to_lowercase();
+        name.starts_with("ungoogled-chromium")
+          && name.contains("macos")
+          && name.ends_with(".dmg")
+      }),
+      _ => None,
+    };
+
+    if let Some(asset) = asset {
+      log::info!(
+        "Selected Wayfern asset for {}/{}: {}",
+        os,
+        arch,
+        asset.name
+      );
+      Some(asset.browser_download_url.clone())
+    } else {
+      log::warn!(
+        "No matching Wayfern asset found for {}/{}. Available assets: {:?}",
+        os,
+        arch,
         assets.iter().map(|a| &a.name).collect::<Vec<_>>()
       );
       None
@@ -527,25 +572,21 @@ impl Downloader {
     browser_str: String,
     version: String,
   ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    // Only check Wayfern terms if Wayfern is already downloaded
-    let terms_manager = crate::wayfern_terms::WayfernTermsManager::instance();
-    if terms_manager.is_wayfern_downloaded() && !terms_manager.is_terms_accepted() {
-      return Err("Please accept Wayfern Terms and Conditions before downloading browsers".into());
-    }
+    // fingerprint-chromium is open-source (BSD-3) — no terms acceptance needed
 
     // For Wayfern/Camoufox, resolve the actual available version from the API
     let version = if browser_str == "wayfern" {
       match self
         .api_client
-        .fetch_wayfern_version_with_caching(true)
+        .fetch_wayfern_releases_with_caching(true)
         .await
       {
-        Ok(info) if info.version != version => {
+        Ok(releases) if !releases.is_empty() && releases[0].tag_name != version => {
           log::info!(
             "Wayfern: requested {version}, using available {}",
-            info.version
+            releases[0].tag_name
           );
-          info.version
+          releases[0].tag_name.clone()
         }
         _ => version,
       }

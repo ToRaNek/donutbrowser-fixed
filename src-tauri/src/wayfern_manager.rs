@@ -16,31 +16,30 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WayfernConfig {
   #[serde(default)]
-  pub fingerprint: Option<String>,
+  pub seed: Option<u32>, // --fingerprint=<seed>
+  #[serde(default)]
+  pub os: Option<String>, // --fingerprint-platform= (windows|linux|macos)
+  #[serde(default)]
+  pub brand: Option<String>, // --fingerprint-brand= (Chrome|Edge)
+  #[serde(default)]
+  pub hardware_concurrency: Option<u32>, // --fingerprint-hardware-concurrency=
+  #[serde(default)]
+  pub timezone: Option<String>, // --timezone=
+  #[serde(default)]
+  pub lang: Option<String>, // --lang=
   #[serde(default)]
   pub randomize_fingerprint_on_launch: Option<bool>,
   #[serde(default)]
-  pub os: Option<String>,
-  #[serde(default)]
-  pub screen_max_width: Option<u32>,
-  #[serde(default)]
-  pub screen_max_height: Option<u32>,
-  #[serde(default)]
-  pub screen_min_width: Option<u32>,
-  #[serde(default)]
-  pub screen_min_height: Option<u32>,
-  #[serde(default)]
-  pub geoip: Option<serde_json::Value>, // For compatibility with shared config form
-  #[serde(default)]
-  pub block_images: Option<bool>, // For compatibility with shared config form
+  pub geoip: Option<serde_json::Value>,
   #[serde(default)]
   pub block_webrtc: Option<bool>,
-  #[serde(default)]
-  pub block_webgl: Option<bool>,
   #[serde(default)]
   pub executable_path: Option<String>,
   #[serde(default, skip_serializing)]
   pub proxy: Option<String>,
+  // Keep for backward compat with old profiles - ignored at runtime
+  #[serde(default)]
+  pub fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,116 +110,6 @@ impl WayfernManager {
     let port = listener.local_addr()?.port();
     drop(listener);
     Ok(port)
-  }
-
-  /// Normalize fingerprint data from Wayfern CDP format to our storage format.
-  /// Wayfern returns fields like fonts, webglParameters as JSON strings which we keep as-is.
-  fn normalize_fingerprint(fingerprint: serde_json::Value) -> serde_json::Value {
-    // Our storage format matches what Wayfern returns:
-    // - fonts, plugins, mimeTypes, voices are JSON strings
-    // - webglParameters, webgl2Parameters, etc. are JSON strings
-    // The form displays them as JSON text areas, so no conversion needed.
-    fingerprint
-  }
-
-  /// Denormalize fingerprint data from our storage format to Wayfern CDP format.
-  /// Wayfern expects certain fields as JSON strings.
-  fn denormalize_fingerprint(fingerprint: serde_json::Value) -> serde_json::Value {
-    // Our storage format matches what Wayfern expects:
-    // - fonts, plugins, mimeTypes, voices are JSON strings
-    // - webglParameters, webgl2Parameters, etc. are JSON strings
-    // So no conversion is needed
-    fingerprint
-  }
-
-  /// Generate a fingerprint locally using Camoufox's Bayesian network.
-  /// Used as fallback when Wayfern CDP cross-OS fingerprint generation fails (no token).
-  fn generate_local_fingerprint(
-    os: &str,
-  ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
-    use crate::camoufox::fingerprint::types::FingerprintOptions;
-    use crate::camoufox::fingerprint::FingerprintGenerator;
-
-    let generator = FingerprintGenerator::new()
-      .map_err(|e| format!("Failed to create fingerprint generator: {e}"))?;
-
-    let options = FingerprintOptions {
-      operating_system: Some(os.to_string()),
-      browsers: None, // Allow any browser for better cross-OS compatibility
-      devices: Some(vec!["desktop".to_string()]),
-      ..Default::default()
-    };
-
-    let result = generator
-      .get_fingerprint(&options)
-      .map_err(|e| format!("Failed to generate local fingerprint: {e}"))?;
-
-    let fp = &result.fingerprint;
-    let nav = &fp.navigator;
-
-    // Build a Wayfern-compatible fingerprint from Camoufox Bayesian output
-    let platform = match os {
-      "windows" => "Win32",
-      "macos" => "MacIntel",
-      _ => "Linux x86_64",
-    };
-
-    let os_part = match os {
-      "windows" => "Windows NT 10.0; Win64; x64",
-      "macos" => "Macintosh; Intel Mac OS X 10_15_7",
-      _ => "X11; Linux x86_64",
-    };
-
-    // Use a Chrome-based UA for Wayfern (it's Chromium-based)
-    let user_agent = format!(
-      "Mozilla/5.0 ({os_part}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
-    );
-
-    let mut fp_json = json!({
-      "userAgent": user_agent,
-      "platform": platform,
-      "screenWidth": fp.screen.width,
-      "screenHeight": fp.screen.height,
-      "outerWidth": fp.screen.width,
-      "outerHeight": fp.screen.height - 80,
-      "innerWidth": fp.screen.width,
-      "innerHeight": fp.screen.height - 140,
-      "availWidth": fp.screen.width,
-      "availHeight": fp.screen.height - 40,
-      "colorDepth": fp.screen.color_depth,
-      "pixelDepth": fp.screen.pixel_depth,
-      "devicePixelRatio": fp.screen.device_pixel_ratio,
-      "hardwareConcurrency": nav.hardware_concurrency,
-      "deviceMemory": nav.device_memory.unwrap_or(8),
-      "maxTouchPoints": nav.max_touch_points,
-      "language": nav.language,
-      "languages": nav.languages,
-      "vendor": "Google Inc.",
-      "vendorSub": "",
-      "product": "Gecko",
-      "productSub": "20030107",
-      "webdriver": false,
-    });
-
-    // Add video card if available
-    if !fp.video_card.vendor.is_empty() {
-      fp_json.as_object_mut().unwrap().insert(
-        "webglVendor".to_string(),
-        json!(fp.video_card.vendor),
-      );
-      fp_json.as_object_mut().unwrap().insert(
-        "webglRenderer".to_string(),
-        json!(fp.video_card.renderer),
-      );
-    }
-
-    log::info!(
-      "Generated local Wayfern fingerprint for OS: {}, UA: {}",
-      os,
-      user_agent
-    );
-
-    Ok(fp_json)
   }
 
   async fn wait_for_cdp_ready(
@@ -299,241 +188,13 @@ impl WayfernManager {
   pub async fn generate_fingerprint_config(
     &self,
     _app_handle: &AppHandle,
-    profile: &BrowserProfile,
+    _profile: &BrowserProfile,
     config: &WayfernConfig,
   ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let executable_path = if let Some(path) = &config.executable_path {
-      let p = PathBuf::from(path);
-      if p.exists() {
-        p
-      } else {
-        log::warn!("Stored Wayfern executable path does not exist: {path}, falling back to dynamic resolution");
-        BrowserRunner::instance()
-          .get_browser_executable_path(profile)
-          .map_err(|e| format!("Failed to get Wayfern executable path: {e}"))?
-      }
-    } else {
-      BrowserRunner::instance()
-        .get_browser_executable_path(profile)
-        .map_err(|e| format!("Failed to get Wayfern executable path: {e}"))?
-    };
-
-    let port = Self::find_free_port().await?;
-    log::info!("Launching headless Wayfern on port {port} for fingerprint generation");
-
-    let temp_profile_dir =
-      std::env::temp_dir().join(format!("wayfern_fingerprint_{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&temp_profile_dir)?;
-
-    let mut cmd = TokioCommand::new(&executable_path);
-    cmd
-      .arg("--headless=new")
-      .arg(format!("--remote-debugging-port={port}"))
-      .arg("--remote-debugging-address=127.0.0.1")
-      .arg(format!("--user-data-dir={}", temp_profile_dir.display()))
-      .arg("--disable-gpu")
-      .arg("--no-first-run")
-      .arg("--no-default-browser-check")
-      .arg("--disable-background-mode")
-      .arg("--use-mock-keychain")
-      .arg("--password-store=basic")
-      .arg("--disable-features=DialMediaRouteProvider")
-      .stdout(Stdio::null())
-      .stderr(Stdio::null());
-
-    let child = cmd.spawn()?;
-    let child_id = child.id();
-
-    let cleanup = || async {
-      if let Some(id) = child_id {
-        #[cfg(unix)]
-        {
-          use nix::sys::signal::{kill, Signal};
-          use nix::unistd::Pid;
-          let _ = kill(Pid::from_raw(id as i32), Signal::SIGTERM);
-        }
-        #[cfg(windows)]
-        {
-          use std::os::windows::process::CommandExt;
-          const CREATE_NO_WINDOW: u32 = 0x08000000;
-          let _ = std::process::Command::new("taskkill")
-            .args(["/PID", &id.to_string(), "/F"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output();
-        }
-      }
-      let _ = std::fs::remove_dir_all(&temp_profile_dir);
-    };
-
-    if let Err(e) = self.wait_for_cdp_ready(port).await {
-      cleanup().await;
-      return Err(e);
-    }
-
-    let targets = match self.get_cdp_targets(port).await {
-      Ok(t) => t,
-      Err(e) => {
-        cleanup().await;
-        return Err(e);
-      }
-    };
-
-    let page_target = targets
-      .iter()
-      .find(|t| t.target_type == "page" && t.websocket_debugger_url.is_some());
-
-    let ws_url = match page_target {
-      Some(target) => target.websocket_debugger_url.as_ref().unwrap().clone(),
-      None => {
-        cleanup().await;
-        return Err("No page target found for CDP".into());
-      }
-    };
-
-    let os = config
-      .os
-      .as_deref()
-      .unwrap_or(if cfg!(target_os = "macos") {
-        "macos"
-      } else if cfg!(target_os = "linux") {
-        "linux"
-      } else {
-        "windows"
-      });
-
-    // Try CDP fingerprint generation first, fall back to local Bayesian generator
-    let wayfern_token = crate::cloud_auth::CLOUD_AUTH.get_wayfern_token().await;
-    let mut refresh_params = json!({ "operatingSystem": os });
-    if let Some(ref token) = wayfern_token {
-      refresh_params
-        .as_object_mut()
-        .unwrap()
-        .insert("wayfernToken".to_string(), json!(token));
-    }
-
-    let refresh_result = self
-      .send_cdp_command(&ws_url, "Wayfern.refreshFingerprint", refresh_params)
-      .await;
-
-    // If CDP refresh failed (e.g. cross-OS without token), generate locally via Camoufox Bayesian network
-    let use_local_fallback = refresh_result.is_err();
-    if use_local_fallback {
-      log::info!(
-        "Wayfern CDP fingerprint generation failed, using local Bayesian generator for OS: {}",
-        os
-      );
-    }
-
-    let mut normalized = if use_local_fallback {
-      // Generate fingerprint locally using Camoufox's Bayesian network
-      Self::generate_local_fingerprint(os)?
-    } else {
-      let get_result = self
-        .send_cdp_command(&ws_url, "Wayfern.getFingerprint", json!({}))
-        .await;
-
-      match get_result {
-        Ok(result) => {
-          let fp = result.get("fingerprint").cloned().unwrap_or(result);
-          Self::normalize_fingerprint(fp)
-        }
-        Err(e) => {
-          cleanup().await;
-          return Err(format!("Failed to get fingerprint: {e}").into());
-        }
-      }
-    };
-
-    // Apply geolocation based on proxy IP or geoip config
-    let geoip_option = config.geoip.as_ref();
-    let should_geolocate = match geoip_option {
-      Some(serde_json::Value::Bool(false)) => false,
-      _ => true,
-    };
-
-    if should_geolocate {
-      let geo_result = async {
-        let ip = match geoip_option {
-          Some(serde_json::Value::String(ip_str)) => ip_str.clone(),
-          _ => {
-            crate::ip_utils::fetch_public_ip(config.proxy.as_deref())
-              .await
-              .map_err(|e| format!("Failed to fetch public IP: {e}"))?
-          }
-        };
-        crate::camoufox::geolocation::get_geolocation(&ip)
-          .map_err(|e| format!("Failed to get geolocation for IP {ip}: {e}"))
-      }
-      .await;
-
-      match geo_result {
-        Ok(geo) => {
-          if let Some(obj) = normalized.as_object_mut() {
-            obj.insert("timezone".to_string(), json!(geo.timezone));
-            if let Ok(tz) = geo.timezone.parse::<chrono_tz::Tz>() {
-              use chrono::Offset;
-              let now = chrono::Utc::now().with_timezone(&tz);
-              let offset_seconds = now.offset().fix().local_minus_utc();
-              let offset_minutes = -(offset_seconds / 60);
-              obj.insert("timezoneOffset".to_string(), json!(offset_minutes));
-            }
-            obj.insert("latitude".to_string(), json!(geo.latitude));
-            obj.insert("longitude".to_string(), json!(geo.longitude));
-            let locale_str = geo.locale.as_string();
-            obj.insert("language".to_string(), json!(&locale_str));
-            obj.insert(
-              "languages".to_string(),
-              json!([&locale_str, &geo.locale.language]),
-            );
-          }
-          log::info!(
-            "Applied geolocation to Wayfern fingerprint: {} ({})",
-            geo.locale.as_string(),
-            geo.timezone
-          );
-        }
-        Err(e) => {
-          log::warn!("Geolocation failed, using defaults: {e}");
-          if let Some(obj) = normalized.as_object_mut() {
-            if !obj.contains_key("timezone") {
-              obj.insert("timezone".to_string(), json!("America/New_York"));
-            }
-            if !obj.contains_key("timezoneOffset") {
-              obj.insert("timezoneOffset".to_string(), json!(300));
-            }
-          }
-        }
-      }
-    }
-
-    let fingerprint = normalized;
-
-    cleanup().await;
-
-    let fingerprint_json = serde_json::to_string(&fingerprint)
-      .map_err(|e| format!("Failed to serialize fingerprint: {e}"))?;
-
-    log::info!(
-      "Generated Wayfern fingerprint for OS: {}, fields: {:?}",
-      os,
-      fingerprint
-        .as_object()
-        .map(|o| o.keys().collect::<Vec<_>>())
-    );
-
-    // Log timezone/geolocation fields specifically for debugging
-    if let Some(obj) = fingerprint.as_object() {
-      log::info!(
-        "Generated fingerprint - timezone: {:?}, timezoneOffset: {:?}, latitude: {:?}, longitude: {:?}, language: {:?}",
-        obj.get("timezone"),
-        obj.get("timezoneOffset"),
-        obj.get("latitude"),
-        obj.get("longitude"),
-        obj.get("language")
-      );
-    }
-
-    Ok(fingerprint_json)
+    // fingerprint-chromium uses deterministic seeds: just generate a random one
+    let seed = config.seed.unwrap_or_else(|| rand::random::<u32>());
+    log::info!("Generated fingerprint-chromium seed: {seed}");
+    Ok(seed.to_string())
   }
 
   #[allow(clippy::too_many_arguments)]
@@ -569,7 +230,7 @@ impl WayfernManager {
       Some(p) => p,
       None => Self::find_free_port().await?,
     };
-    log::info!("Launching Wayfern on CDP port {port}");
+    log::info!("Launching fingerprint-chromium on CDP port {port}");
 
     let mut args = vec![
       format!("--remote-debugging-port={port}"),
@@ -591,6 +252,33 @@ impl WayfernManager {
       "--password-store=basic".to_string(),
     ];
 
+    // Build fingerprint CLI args for fingerprint-chromium
+    // The "fingerprint" field now stores the seed (a u32 string) from generate_fingerprint_config
+    let seed = config
+      .fingerprint
+      .as_deref()
+      .and_then(|s| s.parse::<u32>().ok())
+      .or(config.seed)
+      .unwrap_or_else(|| rand::random::<u32>());
+    args.push(format!("--fingerprint={seed}"));
+    log::info!("Using fingerprint seed: {seed}");
+
+    if let Some(ref os) = config.os {
+      args.push(format!("--fingerprint-platform={os}"));
+    }
+    if let Some(ref brand) = config.brand {
+      args.push(format!("--fingerprint-brand={brand}"));
+    }
+    if let Some(hw) = config.hardware_concurrency {
+      args.push(format!("--fingerprint-hardware-concurrency={hw}"));
+    }
+    if let Some(ref tz) = config.timezone {
+      args.push(format!("--timezone={tz}"));
+    }
+    if let Some(ref lang) = config.lang {
+      args.push(format!("--lang={lang}"));
+    }
+
     if let Some(proxy) = proxy_url {
       args.push(format!("--proxy-server={proxy}"));
     }
@@ -607,17 +295,10 @@ impl WayfernManager {
       args.push(format!("--load-extension={}", extension_paths.join(",")));
     }
 
-    // Pass wayfern token as CLI flag so the browser can gate CDP features
-    let wayfern_token = crate::cloud_auth::CLOUD_AUTH.get_wayfern_token().await;
-    if let Some(ref token) = wayfern_token {
-      args.push(format!("--wayfern-token={token}"));
-      log::info!("Wayfern token passed as CLI flag (length: {})", token.len());
-    } else {
-      log::warn!("No wayfern token available — CDP gated methods will be blocked");
+    // Pass URL as last CLI arg (standard Chromium behavior)
+    if let Some(url) = url {
+      args.push(url.to_string());
     }
-
-    // Don't add URL to args - we'll navigate via CDP after setting fingerprint
-    // This ensures fingerprint is applied at navigation commit time
 
     let mut cmd = TokioCommand::new(&executable_path);
     cmd.args(&args);
@@ -629,149 +310,50 @@ impl WayfernManager {
 
     self.wait_for_cdp_ready(port).await?;
 
-    // Get CDP targets first - needed for both fingerprint and navigation
-    let targets = self.get_cdp_targets(port).await?;
-    log::info!("Found {} CDP targets", targets.len());
+    // Set geolocation override via CDP if geoip config is present
+    let geoip_option = config.geoip.as_ref();
+    let should_geolocate = !matches!(geoip_option, Some(serde_json::Value::Bool(false)));
 
-    let page_targets: Vec<_> = targets.iter().filter(|t| t.target_type == "page").collect();
-    log::info!("Found {} page targets", page_targets.len());
-
-    // Apply fingerprint if configured
-    if let Some(fingerprint_json) = &config.fingerprint {
-      log::info!(
-        "Applying fingerprint to Wayfern browser, fingerprint length: {} chars",
-        fingerprint_json.len()
-      );
-
-      let stored_value: serde_json::Value = serde_json::from_str(fingerprint_json)
-        .map_err(|e| format!("Failed to parse stored fingerprint JSON: {e}"))?;
-
-      // The stored fingerprint should be the fingerprint object directly (after our fix in generate_fingerprint_config)
-      // But for backwards compatibility, also handle the wrapped format
-      let mut fingerprint = if stored_value.get("fingerprint").is_some() {
-        // Old format: {"fingerprint": {...}} - extract the inner fingerprint
-        stored_value.get("fingerprint").cloned().unwrap()
-      } else {
-        // New format: fingerprint object directly {...}
-        stored_value.clone()
-      };
-
-      // Add default timezone if not present (for profiles created before timezone was added)
-      if let Some(obj) = fingerprint.as_object_mut() {
-        if !obj.contains_key("timezone") {
-          obj.insert("timezone".to_string(), json!("America/New_York"));
-          log::info!("Added default timezone to fingerprint");
-        }
-        if !obj.contains_key("timezoneOffset") {
-          obj.insert("timezoneOffset".to_string(), json!(300));
-          log::info!("Added default timezoneOffset to fingerprint");
-        }
-      }
-
-      // Denormalize fingerprint for Wayfern CDP (convert arrays/objects to JSON strings)
-      let mut fingerprint_for_cdp = Self::denormalize_fingerprint(fingerprint);
-
-      // Normalize languages: if it's a comma-separated string, convert to array
-      if let Some(obj) = fingerprint_for_cdp.as_object_mut() {
-        if let Some(serde_json::Value::String(s)) = obj.get("languages").cloned() {
-          let arr: Vec<&str> = s.split(',').map(|l| l.trim()).collect();
-          obj.insert("languages".to_string(), json!(arr));
-        }
-      }
-
-      log::info!(
-        "Fingerprint prepared for CDP command, fields: {:?}",
-        fingerprint_for_cdp
-          .as_object()
-          .map(|o| o.keys().collect::<Vec<_>>())
-      );
-
-      // Log timezone and geolocation fields specifically for debugging
-      if let Some(obj) = fingerprint_for_cdp.as_object() {
-        log::info!(
-          "Timezone/Geolocation fields - timezone: {:?}, timezoneOffset: {:?}, latitude: {:?}, longitude: {:?}, language: {:?}, languages: {:?}",
-          obj.get("timezone"),
-          obj.get("timezoneOffset"),
-          obj.get("latitude"),
-          obj.get("longitude"),
-          obj.get("language"),
-          obj.get("languages")
-        );
-      }
-
-      // Include wayfern token if available (enables cross-OS fingerprinting for paid users)
-      let wayfern_token = crate::cloud_auth::CLOUD_AUTH.get_wayfern_token().await;
-      let mut fingerprint_params = fingerprint_for_cdp.clone();
-      if let Some(ref token) = wayfern_token {
-        if let Some(obj) = fingerprint_params.as_object_mut() {
-          obj.insert("wayfernToken".to_string(), json!(token));
-        }
-      }
-
-      for target in &page_targets {
-        if let Some(ws_url) = &target.websocket_debugger_url {
-          log::info!("Applying fingerprint to target via WebSocket: {}", ws_url);
-          // Wayfern.setFingerprint expects the fingerprint object directly, NOT wrapped
-          match self
-            .send_cdp_command(ws_url, "Wayfern.setFingerprint", fingerprint_params.clone())
+    if should_geolocate {
+      let geo_result = async {
+        let ip = match geoip_option {
+          Some(serde_json::Value::String(ip_str)) => ip_str.clone(),
+          _ => crate::ip_utils::fetch_public_ip(config.proxy.as_deref())
             .await
-          {
-            Ok(result) => log::info!(
-              "Successfully applied fingerprint to page target: {:?}",
-              result
-            ),
-            Err(e) => log::error!("Failed to apply fingerprint to target: {e}"),
-          }
-        }
-      }
-    } else {
-      log::warn!("No fingerprint found in config, browser will use default fingerprint");
-    }
-
-    // Set geolocation override via CDP so navigator.geolocation.getCurrentPosition() matches
-    if let Some(fingerprint_json) = &config.fingerprint {
-      if let Ok(fp) = serde_json::from_str::<serde_json::Value>(fingerprint_json) {
-        let fp_obj = if fp.get("fingerprint").is_some() {
-          fp.get("fingerprint").unwrap()
-        } else {
-          &fp
+            .map_err(|e| format!("Failed to fetch public IP: {e}"))?,
         };
-        if let (Some(lat), Some(lng)) = (
-          fp_obj.get("latitude").and_then(|v| v.as_f64()),
-          fp_obj.get("longitude").and_then(|v| v.as_f64()),
-        ) {
-          let accuracy = fp_obj
-            .get("accuracy")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(100.0);
-          if let Some(target) = page_targets.first() {
-            if let Some(ws_url) = &target.websocket_debugger_url {
-              let _ = self
-                .send_cdp_command(
-                  ws_url,
-                  "Emulation.setGeolocationOverride",
-                  json!({ "latitude": lat, "longitude": lng, "accuracy": accuracy }),
-                )
-                .await;
-              log::info!("Set geolocation override: lat={lat}, lng={lng}");
+        crate::camoufox::geolocation::get_geolocation(&ip)
+          .map_err(|e| format!("Failed to get geolocation for IP {ip}: {e}"))
+      }
+      .await;
+
+      match geo_result {
+        Ok(geo) => {
+          let lat = geo.latitude;
+          let lng = geo.longitude;
+          let accuracy = geo.accuracy.unwrap_or(100.0);
+
+          let targets = self.get_cdp_targets(port).await;
+          if let Ok(targets) = targets {
+            if let Some(target) = targets
+              .iter()
+              .find(|t| t.target_type == "page" && t.websocket_debugger_url.is_some())
+            {
+              if let Some(ws_url) = &target.websocket_debugger_url {
+                let _ = self
+                  .send_cdp_command(
+                    ws_url,
+                    "Emulation.setGeolocationOverride",
+                    json!({ "latitude": lat, "longitude": lng, "accuracy": accuracy }),
+                  )
+                  .await;
+                log::info!("Set geolocation override: lat={lat}, lng={lng}");
+              }
             }
           }
         }
-      }
-    }
-
-    // Navigate to URL via CDP - fingerprint will be applied at navigation commit time
-    if let Some(url) = url {
-      log::info!("Navigating to URL via CDP: {}", url);
-      if let Some(target) = page_targets.first() {
-        if let Some(ws_url) = &target.websocket_debugger_url {
-          match self
-            .send_cdp_command(ws_url, "Page.navigate", json!({ "url": url }))
-            .await
-          {
-            Ok(_) => log::info!("Successfully navigated to URL: {}", url),
-            Err(e) => log::error!("Failed to navigate to URL: {e}"),
-          }
+        Err(e) => {
+          log::warn!("Geolocation lookup failed, skipping override: {e}");
         }
       }
     }

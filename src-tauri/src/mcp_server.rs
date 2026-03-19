@@ -2741,13 +2741,14 @@ impl McpServer {
         let config = profile.wayfern_config.as_ref().cloned().unwrap_or_default();
         serde_json::json!({
           "browser": "wayfern",
+          "seed": config.seed,
           "fingerprint": config.fingerprint,
           "os": config.os,
+          "brand": config.brand,
+          "hardware_concurrency": config.hardware_concurrency,
+          "timezone": config.timezone,
+          "lang": config.lang,
           "randomize_fingerprint_on_launch": config.randomize_fingerprint_on_launch,
-          "screen_max_width": config.screen_max_width,
-          "screen_max_height": config.screen_max_height,
-          "screen_min_width": config.screen_min_width,
-          "screen_min_height": config.screen_min_height,
         })
       }
       _ => {
