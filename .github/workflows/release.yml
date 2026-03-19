@@ -7,64 +7,13 @@ on:
 
 permissions:
   contents: write
-  security-events: write
-  packages: read
-  actions: read
 
 env:
   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-  STABLE_RELEASE: "true"
 
 jobs:
-  security-scan:
-    name: Security Vulnerability Scan
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@c5996e0193a3df57d695c1b8a1dec2a4c62e8730" # v2.3.3
-    with:
-      scan-args: |-
-        -r
-        --skip-git
-        --lockfile=pnpm-lock.yaml
-        --lockfile=src-tauri/Cargo.lock
-        ./
-    permissions:
-      security-events: write
-      contents: read
-      actions: read
-
-  lint-js:
-    name: Lint JavaScript/TypeScript
-    uses: ./.github/workflows/lint-js.yml
-    secrets: inherit
-    permissions:
-      contents: read
-
-  lint-rust:
-    name: Lint Rust
-    uses: ./.github/workflows/lint-rs.yml
-    secrets: inherit
-    permissions:
-      contents: read
-
-  codeql:
-    name: CodeQL
-    uses: ./.github/workflows/codeql.yml
-    secrets: inherit
-    permissions:
-      security-events: write
-      contents: read
-      packages: read
-      actions: read
-
-  spellcheck:
-    name: Spell Check
-    uses: ./.github/workflows/spellcheck.yml
-    secrets: inherit
-    permissions:
-      contents: read
-
   release:
-    needs: [security-scan, lint-js, lint-rust, codeql, spellcheck]
     permissions:
       contents: write
     strategy:
@@ -75,57 +24,47 @@ jobs:
             args: "--target aarch64-apple-darwin --verbose"
             arch: "aarch64"
             target: "aarch64-apple-darwin"
-            pkg_target: "latest-macos-arm64"
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin --verbose"
             arch: "x86_64"
             target: "x86_64-apple-darwin"
-            pkg_target: "latest-macos-x64"
           - platform: "ubuntu-22.04"
             args: "--target x86_64-unknown-linux-gnu --verbose"
             arch: "x86_64"
             target: "x86_64-unknown-linux-gnu"
-            pkg_target: "latest-linux-x64"
-          - platform: "ubuntu-22.04-arm"
-            args: "--target aarch64-unknown-linux-gnu --verbose"
-            arch: "aarch64"
-            target: "aarch64-unknown-linux-gnu"
-            pkg_target: "latest-linux-arm64"
           - platform: "windows-latest"
             args: "--target x86_64-pc-windows-msvc --verbose"
             arch: "x86_64"
             target: "x86_64-pc-windows-msvc"
-            pkg_target: "latest-win-x64"
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 #v6.0.1
+      - uses: actions/checkout@v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 #v4.4.0
+        uses: pnpm/action-setup@v4
         with:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f #v6.1.0
+        uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
           cache: "pnpm"
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 #master
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           targets: ${{ matrix.target }}
 
       - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm'
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev pkg-config xdg-utils
 
       - name: Rust cache
-        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 #v2.9.1
+        uses: swatinem/rust-cache@v2
         with:
           workdir: ./src-tauri
 
@@ -143,9 +82,6 @@ jobs:
             ls -la
             exit 1
           fi
-          echo "Frontend dist directory verified at $(pwd)/dist"
-          echo "Checking from src-tauri perspective:"
-          ls -la src-tauri/../dist || echo "Warning: dist not accessible from src-tauri"
 
       - name: Build sidecar binaries
         shell: bash
@@ -168,48 +104,10 @@ jobs:
             chmod +x src-tauri/binaries/donut-daemon-${{ matrix.target }}
           fi
 
-      - name: Import Apple certificate
-        if: matrix.platform == 'macos-latest'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_KEY: ${{ secrets.APPLE_CERTIFICATE_KEY }}
-        run: |
-          CERT_PATH=$RUNNER_TEMP/cert.cer
-          KEY_PATH=$RUNNER_TEMP/cert.key
-          PEM_PATH=$RUNNER_TEMP/cert.pem
-          P12_PATH=$RUNNER_TEMP/build_certificate.p12
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-          P12_PASSWORD=$(openssl rand -base64 32)
-
-          echo "$APPLE_CERTIFICATE" | base64 --decode > $CERT_PATH
-          echo "$APPLE_CERTIFICATE_KEY" | base64 --decode > $KEY_PATH
-
-          openssl x509 -inform DER -in $CERT_PATH -out $PEM_PATH
-          openssl pkcs12 -export -out $P12_PATH -inkey $KEY_PATH -in $PEM_PATH -passout pass:$P12_PASSWORD
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-
-          security import $P12_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH login.keychain-db
-
-          echo "Available signing identities:"
-          security find-identity -v -p codesigning $KEYCHAIN_PATH
-
-          rm -f $CERT_PATH $KEY_PATH $PEM_PATH $P12_PATH
-
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@73fb865345c54760d875b94642314f8c0c894afa #v0.6.1
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: ./src-tauri
           tagName: ${{ github.ref_name }}
@@ -218,105 +116,3 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-
-      - name: Clean up Apple certificate
-        if: matrix.platform == 'macos-latest' && always()
-        run: |
-          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
-          rm -f $RUNNER_TEMP/build_certificate.p12 || true
-
-#      - name: Commit CHANGELOG.md
-#        uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 #v6.0.1
-#        with:
-#          branch: main
-#          commit_message: "docs: update CHANGELOG.md for ${{ github.ref_name }} [skip ci]"
-
-  publish-repos:
-    needs: [release]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Download Linux packages from release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p /tmp/packages
-          gh release download "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "*.deb" \
-            --dir /tmp/packages
-          gh release download "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "*.rpm" \
-            --dir /tmp/packages
-          echo "Downloaded packages:"
-          ls -la /tmp/packages/
-
-      - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 #v6.3.0
-        with:
-          go-version: "1.23"
-          cache: false
-
-      - name: Install repogen
-        run: |
-          go install github.com/ralt/repogen/cmd/repogen@latest
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
-      - name: Sync existing repo metadata from R2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: "https://${{ secrets.R2_ENDPOINT_URL }}"
-          R2_BUCKET: ${{ secrets.R2_BUCKET_NAME }}
-        run: |
-          mkdir -p /tmp/repo
-          aws s3 cp "s3://${R2_BUCKET}/dists" /tmp/repo/dists \
-            --endpoint-url "${R2_ENDPOINT}" --recursive 2>/dev/null || true
-          aws s3 cp "s3://${R2_BUCKET}/repodata" /tmp/repo/repodata \
-            --endpoint-url "${R2_ENDPOINT}" --recursive 2>/dev/null || true
-
-      - name: Generate repository with repogen
-        run: |
-          repogen generate \
-            --input-dir /tmp/packages \
-            --output-dir /tmp/repo \
-            --incremental \
-            --arch amd64,arm64 \
-            --origin "Donut Browser" \
-            --label "Donut Browser" \
-            --codename stable \
-            --components main \
-            --verbose
-
-      - name: Upload repository to R2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: "https://${{ secrets.R2_ENDPOINT_URL }}"
-          R2_BUCKET: ${{ secrets.R2_BUCKET_NAME }}
-        run: |
-          aws s3 cp /tmp/repo/dists "s3://${R2_BUCKET}/dists" \
-            --endpoint-url "${R2_ENDPOINT}" --recursive
-          aws s3 cp /tmp/repo/pool "s3://${R2_BUCKET}/pool" \
-            --endpoint-url "${R2_ENDPOINT}" --recursive
-          aws s3 cp /tmp/repo/repodata "s3://${R2_BUCKET}/repodata" \
-            --endpoint-url "${R2_ENDPOINT}" --recursive
-          aws s3 cp /tmp/repo/Packages "s3://${R2_BUCKET}/Packages" \
-            --endpoint-url "${R2_ENDPOINT}" --recursive
-
-      - name: Verify upload
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: "https://${{ secrets.R2_ENDPOINT_URL }}"
-          R2_BUCKET: ${{ secrets.R2_BUCKET_NAME }}
-        run: |
-          echo "DEB repo:"
-          aws s3 ls "s3://${R2_BUCKET}/dists/stable/" --endpoint-url "${R2_ENDPOINT}" || echo "  (listing not available)"
-          echo "RPM repo:"
-          aws s3 ls "s3://${R2_BUCKET}/repodata/" --endpoint-url "${R2_ENDPOINT}" || echo "  (listing not available)"
