@@ -133,6 +133,96 @@ impl WayfernManager {
     fingerprint
   }
 
+  /// Generate a fingerprint locally using Camoufox's Bayesian network.
+  /// Used as fallback when Wayfern CDP cross-OS fingerprint generation fails (no token).
+  fn generate_local_fingerprint(
+    os: &str,
+  ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    use crate::camoufox::fingerprint::types::FingerprintOptions;
+    use crate::camoufox::fingerprint::FingerprintGenerator;
+
+    let generator = FingerprintGenerator::new()
+      .map_err(|e| format!("Failed to create fingerprint generator: {e}"))?;
+
+    let options = FingerprintOptions {
+      operating_system: Some(os.to_string()),
+      browsers: None, // Allow any browser for better cross-OS compatibility
+      devices: Some(vec!["desktop".to_string()]),
+      ..Default::default()
+    };
+
+    let result = generator
+      .get_fingerprint(&options)
+      .map_err(|e| format!("Failed to generate local fingerprint: {e}"))?;
+
+    let fp = &result.fingerprint;
+    let nav = &fp.navigator;
+
+    // Build a Wayfern-compatible fingerprint from Camoufox Bayesian output
+    let platform = match os {
+      "windows" => "Win32",
+      "macos" => "MacIntel",
+      _ => "Linux x86_64",
+    };
+
+    let os_part = match os {
+      "windows" => "Windows NT 10.0; Win64; x64",
+      "macos" => "Macintosh; Intel Mac OS X 10_15_7",
+      _ => "X11; Linux x86_64",
+    };
+
+    // Use a Chrome-based UA for Wayfern (it's Chromium-based)
+    let user_agent = format!(
+      "Mozilla/5.0 ({os_part}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+    );
+
+    let mut fp_json = json!({
+      "userAgent": user_agent,
+      "platform": platform,
+      "screenWidth": fp.screen.width,
+      "screenHeight": fp.screen.height,
+      "outerWidth": fp.screen.width,
+      "outerHeight": fp.screen.height - 80,
+      "innerWidth": fp.screen.width,
+      "innerHeight": fp.screen.height - 140,
+      "availWidth": fp.screen.width,
+      "availHeight": fp.screen.height - 40,
+      "colorDepth": fp.screen.color_depth,
+      "pixelDepth": fp.screen.pixel_depth,
+      "devicePixelRatio": fp.screen.device_pixel_ratio,
+      "hardwareConcurrency": nav.hardware_concurrency,
+      "deviceMemory": nav.device_memory.unwrap_or(8),
+      "maxTouchPoints": nav.max_touch_points,
+      "language": nav.language,
+      "languages": nav.languages,
+      "vendor": "Google Inc.",
+      "vendorSub": "",
+      "product": "Gecko",
+      "productSub": "20030107",
+      "webdriver": false,
+    });
+
+    // Add video card if available
+    if !fp.video_card.vendor.is_empty() {
+      fp_json.as_object_mut().unwrap().insert(
+        "webglVendor".to_string(),
+        json!(fp.video_card.vendor),
+      );
+      fp_json.as_object_mut().unwrap().insert(
+        "webglRenderer".to_string(),
+        json!(fp.video_card.renderer),
+      );
+    }
+
+    log::info!(
+      "Generated local Wayfern fingerprint for OS: {}, UA: {}",
+      os,
+      user_agent
+    );
+
+    Ok(fp_json)
+  }
+
   async fn wait_for_cdp_ready(
     &self,
     port: u16,
@@ -311,7 +401,7 @@ impl WayfernManager {
         "windows"
       });
 
-    // Include wayfern token if available (enables cross-OS fingerprinting for paid users)
+    // Try CDP fingerprint generation first, fall back to local Bayesian generator
     let wayfern_token = crate::cloud_auth::CLOUD_AUTH.get_wayfern_token().await;
     let mut refresh_params = json!({ "operatingSystem": os });
     if let Some(ref token) = wayfern_token {
@@ -325,95 +415,98 @@ impl WayfernManager {
       .send_cdp_command(&ws_url, "Wayfern.refreshFingerprint", refresh_params)
       .await;
 
-    if let Err(e) = refresh_result {
-      cleanup().await;
-      return Err(format!("Failed to refresh fingerprint: {e}").into());
+    // If CDP refresh failed (e.g. cross-OS without token), generate locally via Camoufox Bayesian network
+    let use_local_fallback = refresh_result.is_err();
+    if use_local_fallback {
+      log::info!(
+        "Wayfern CDP fingerprint generation failed, using local Bayesian generator for OS: {}",
+        os
+      );
     }
 
-    let get_result = self
-      .send_cdp_command(&ws_url, "Wayfern.getFingerprint", json!({}))
+    let mut normalized = if use_local_fallback {
+      // Generate fingerprint locally using Camoufox's Bayesian network
+      Self::generate_local_fingerprint(os)?
+    } else {
+      let get_result = self
+        .send_cdp_command(&ws_url, "Wayfern.getFingerprint", json!({}))
+        .await;
+
+      match get_result {
+        Ok(result) => {
+          let fp = result.get("fingerprint").cloned().unwrap_or(result);
+          Self::normalize_fingerprint(fp)
+        }
+        Err(e) => {
+          cleanup().await;
+          return Err(format!("Failed to get fingerprint: {e}").into());
+        }
+      }
+    };
+
+    // Apply geolocation based on proxy IP or geoip config
+    let geoip_option = config.geoip.as_ref();
+    let should_geolocate = match geoip_option {
+      Some(serde_json::Value::Bool(false)) => false,
+      _ => true,
+    };
+
+    if should_geolocate {
+      let geo_result = async {
+        let ip = match geoip_option {
+          Some(serde_json::Value::String(ip_str)) => ip_str.clone(),
+          _ => {
+            crate::ip_utils::fetch_public_ip(config.proxy.as_deref())
+              .await
+              .map_err(|e| format!("Failed to fetch public IP: {e}"))?
+          }
+        };
+        crate::camoufox::geolocation::get_geolocation(&ip)
+          .map_err(|e| format!("Failed to get geolocation for IP {ip}: {e}"))
+      }
       .await;
 
-    let fingerprint = match get_result {
-      Ok(result) => {
-        // Wayfern.getFingerprint returns { fingerprint: {...} }
-        // We need to extract just the fingerprint object
-        let fp = result.get("fingerprint").cloned().unwrap_or(result);
-        // Normalize the fingerprint: convert JSON string fields to proper types
-        let mut normalized = Self::normalize_fingerprint(fp);
-
-        // Apply geolocation based on proxy IP or geoip config
-        let geoip_option = config.geoip.as_ref();
-        let should_geolocate = match geoip_option {
-          Some(serde_json::Value::Bool(false)) => false,
-          _ => true, // Default to auto-detect
-        };
-
-        if should_geolocate {
-          let geo_result = async {
-            let ip = match geoip_option {
-              Some(serde_json::Value::String(ip_str)) => ip_str.clone(),
-              _ => {
-                // Auto-detect IP, optionally through proxy
-                crate::ip_utils::fetch_public_ip(config.proxy.as_deref())
-                  .await
-                  .map_err(|e| format!("Failed to fetch public IP: {e}"))?
-              }
-            };
-
-            crate::camoufox::geolocation::get_geolocation(&ip)
-              .map_err(|e| format!("Failed to get geolocation for IP {ip}: {e}"))
-          }
-          .await;
-
-          match geo_result {
-            Ok(geo) => {
-              if let Some(obj) = normalized.as_object_mut() {
-                obj.insert("timezone".to_string(), json!(geo.timezone));
-                // Calculate timezone offset from IANA timezone name
-                if let Ok(tz) = geo.timezone.parse::<chrono_tz::Tz>() {
-                  use chrono::Offset;
-                  let now = chrono::Utc::now().with_timezone(&tz);
-                  let offset_seconds = now.offset().fix().local_minus_utc();
-                  let offset_minutes = -(offset_seconds / 60);
-                  obj.insert("timezoneOffset".to_string(), json!(offset_minutes));
-                }
-                obj.insert("latitude".to_string(), json!(geo.latitude));
-                obj.insert("longitude".to_string(), json!(geo.longitude));
-                let locale_str = geo.locale.as_string();
-                obj.insert("language".to_string(), json!(&locale_str));
-                obj.insert(
-                  "languages".to_string(),
-                  json!([&locale_str, &geo.locale.language]),
-                );
-              }
-              log::info!(
-                "Applied geolocation to Wayfern fingerprint: {} ({})",
-                geo.locale.as_string(),
-                geo.timezone
-              );
+      match geo_result {
+        Ok(geo) => {
+          if let Some(obj) = normalized.as_object_mut() {
+            obj.insert("timezone".to_string(), json!(geo.timezone));
+            if let Ok(tz) = geo.timezone.parse::<chrono_tz::Tz>() {
+              use chrono::Offset;
+              let now = chrono::Utc::now().with_timezone(&tz);
+              let offset_seconds = now.offset().fix().local_minus_utc();
+              let offset_minutes = -(offset_seconds / 60);
+              obj.insert("timezoneOffset".to_string(), json!(offset_minutes));
             }
-            Err(e) => {
-              log::warn!("Geolocation failed, using defaults: {e}");
-              if let Some(obj) = normalized.as_object_mut() {
-                if !obj.contains_key("timezone") {
-                  obj.insert("timezone".to_string(), json!("America/New_York"));
-                }
-                if !obj.contains_key("timezoneOffset") {
-                  obj.insert("timezoneOffset".to_string(), json!(300));
-                }
-              }
+            obj.insert("latitude".to_string(), json!(geo.latitude));
+            obj.insert("longitude".to_string(), json!(geo.longitude));
+            let locale_str = geo.locale.as_string();
+            obj.insert("language".to_string(), json!(&locale_str));
+            obj.insert(
+              "languages".to_string(),
+              json!([&locale_str, &geo.locale.language]),
+            );
+          }
+          log::info!(
+            "Applied geolocation to Wayfern fingerprint: {} ({})",
+            geo.locale.as_string(),
+            geo.timezone
+          );
+        }
+        Err(e) => {
+          log::warn!("Geolocation failed, using defaults: {e}");
+          if let Some(obj) = normalized.as_object_mut() {
+            if !obj.contains_key("timezone") {
+              obj.insert("timezone".to_string(), json!("America/New_York"));
+            }
+            if !obj.contains_key("timezoneOffset") {
+              obj.insert("timezoneOffset".to_string(), json!(300));
             }
           }
         }
+      }
+    }
 
-        normalized
-      }
-      Err(e) => {
-        cleanup().await;
-        return Err(format!("Failed to get fingerprint: {e}").into());
-      }
-    };
+    let fingerprint = normalized;
 
     cleanup().await;
 

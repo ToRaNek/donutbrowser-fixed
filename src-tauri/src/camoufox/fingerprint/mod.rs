@@ -114,8 +114,59 @@ impl FingerprintGenerator {
     &self,
     options: &FingerprintOptions,
   ) -> Result<FingerprintWithHeaders, FingerprintError> {
-    const MAX_RETRIES: u32 = 10;
+    // First try with original constraints (50 attempts)
+    if let Ok(result) = self.try_generate_fingerprint(options, 50) {
+      return Ok(result);
+    }
 
+    // If cross-OS generation failed, retry with relaxed browser constraint
+    // (allow any browser, not just firefox) then patch the user agent
+    if options.operating_system.is_some() {
+      log::info!(
+        "Retrying fingerprint generation with relaxed browser constraint for OS: {:?}",
+        options.operating_system
+      );
+      let mut relaxed = options.clone();
+      relaxed.browsers = None; // Allow any browser in the network
+      if let Ok(mut result) = self.try_generate_fingerprint(&relaxed, 50) {
+        // Patch the user agent to be Firefox-based if original request was Firefox
+        if options
+          .browsers
+          .as_ref()
+          .is_some_and(|b| b.contains(&"firefox".to_string()))
+        {
+          let ua = &result.fingerprint.navigator.user_agent;
+          if !ua.to_lowercase().contains("firefox") {
+            // Replace with a plausible Firefox UA for the target OS
+            let os_str = options.operating_system.as_deref().unwrap_or("linux");
+            let platform = match os_str {
+              "windows" => "Windows NT 10.0; Win64; x64",
+              "macos" => "Macintosh; Intel Mac OS X 10.15",
+              _ => "X11; Linux x86_64",
+            };
+            result.fingerprint.navigator.user_agent = format!(
+              "Mozilla/5.0 ({platform}; rv:135.0) Gecko/20100101 Firefox/135.0"
+            );
+            result.fingerprint.navigator.platform = match os_str {
+              "windows" => "Win32".to_string(),
+              "macos" => "MacIntel".to_string(),
+              _ => "Linux x86_64".to_string(),
+            };
+          }
+        }
+        return Ok(result);
+      }
+    }
+
+    Err(FingerprintError::GenerationFailed(100))
+  }
+
+  /// Try to generate a fingerprint with given options and max attempts.
+  fn try_generate_fingerprint(
+    &self,
+    options: &FingerprintOptions,
+    max_retries: u32,
+  ) -> Result<FingerprintWithHeaders, FingerprintError> {
     // Build constraints from options
     let mut value_possibilities = self.build_constraints(options);
 
@@ -130,7 +181,7 @@ impl FingerprintGenerator {
       value_possibilities.insert("screen".to_string(), sv);
     }
 
-    for attempt in 0..MAX_RETRIES {
+    for attempt in 0..max_retries {
       // Generate input sample consistent with constraints
       let input_sample = self
         .input_network
@@ -181,7 +232,7 @@ impl FingerprintGenerator {
       }
     }
 
-    Err(FingerprintError::GenerationFailed(MAX_RETRIES))
+    Err(FingerprintError::GenerationFailed(max_retries))
   }
 
   /// Build constraint map from options.
