@@ -388,6 +388,15 @@ impl CamoufoxConfigBuilder {
             config.insert(key, value);
           }
           firefox_prefs.insert("webgl.force-enabled".to_string(), serde_json::json!(true));
+          // Prevent Firefox from sanitizing the renderer string to "X, or similar"
+          firefox_prefs.insert(
+            "webgl.sanitize-unmasked-renderer".to_string(),
+            serde_json::json!(false),
+          );
+          firefox_prefs.insert(
+            "webgl.disable-fail-if-major-performance-caveat".to_string(),
+            serde_json::json!(true),
+          );
         }
         Err(e) => {
           log::warn!("Failed to sample WebGL config: {}", e);

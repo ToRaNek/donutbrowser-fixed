@@ -360,6 +360,7 @@ pub struct ApiClient {
   firefox_api_base: String,
   firefox_dev_api_base: String,
   github_api_base: String,
+  #[allow(dead_code)]
   chromium_api_base: String,
 }
 
@@ -904,6 +905,7 @@ impl ApiClient {
     (os.to_string(), arch.to_string())
   }
 
+  #[allow(dead_code)]
   pub async fn fetch_chromium_latest_version(
     &self,
   ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -935,6 +937,7 @@ impl ApiClient {
     Ok(version)
   }
 
+  #[allow(dead_code)]
   pub async fn fetch_chromium_releases_with_caching(
     &self,
     no_caching: bool,

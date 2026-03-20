@@ -596,7 +596,11 @@ impl BrowserVersionManager {
           ("linux", "x64") => format!("ungoogled-chromium-{version}-1-x86_64_linux.tar.xz"),
           ("windows", "x64") => format!("ungoogled-chromium_{version}-1.1_windows_x64.zip"),
           ("macos", _) => format!("ungoogled-chromium_{version}-1.1_macos.dmg"),
-          _ => return Err(format!("Unsupported platform for fingerprint-chromium: {os}/{arch}").into()),
+          _ => {
+            return Err(
+              format!("Unsupported platform for fingerprint-chromium: {os}/{arch}").into(),
+            )
+          }
         };
         Ok(DownloadInfo {
           url: format!(
@@ -803,6 +807,7 @@ impl BrowserVersionManager {
     Ok(releases)
   }
 
+  #[allow(dead_code)]
   async fn fetch_chromium_versions(
     &self,
     no_caching: bool,
@@ -811,6 +816,7 @@ impl BrowserVersionManager {
     Ok(releases.into_iter().map(|r| r.version).collect())
   }
 
+  #[allow(dead_code)]
   async fn fetch_chromium_releases_detailed(
     &self,
     no_caching: bool,
@@ -1010,20 +1016,26 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     {
-      assert_eq!(chromium_info.filename, "chromium-1465660-mac.zip");
-      assert!(chromium_info.url.contains("chrome-mac.zip"));
+      assert_eq!(
+        chromium_info.filename,
+        "ungoogled-chromium_1465660-1.1_macos.dmg"
+      );
     }
 
     #[cfg(target_os = "linux")]
     {
-      assert_eq!(chromium_info.filename, "chromium-1465660-linux.zip");
-      assert!(chromium_info.url.contains("chrome-linux.zip"));
+      assert_eq!(
+        chromium_info.filename,
+        "ungoogled-chromium-1465660-1-x86_64_linux.tar.xz"
+      );
     }
 
     #[cfg(target_os = "windows")]
     {
-      assert_eq!(chromium_info.filename, "chromium-1465660-win.zip");
-      assert!(chromium_info.url.contains("chrome-win.zip"));
+      assert_eq!(
+        chromium_info.filename,
+        "ungoogled-chromium_1465660-1.1_windows_x64.zip"
+      );
     }
 
     assert!(chromium_info.is_archive);

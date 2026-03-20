@@ -18,14 +18,14 @@ Choose the right file for your system:
 
 | File | Description |
 |---|---|
-| [Donut_x64-setup.exe](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.18.0_x64-setup.exe) | Windows installer (x64) |
+| [Donut_x64-setup.exe](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.19.0_x64-setup.exe) | Windows installer (x64) |
 
 ### macOS
 
 | File | Description |
 |---|---|
-| [Donut_aarch64.dmg](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.18.0_aarch64.dmg) | macOS Apple Silicon (M1/M2/M3/M4) |
-| [Donut_x64.dmg](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.18.0_x64.dmg) | macOS Intel |
+| [Donut_aarch64.dmg](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.19.0_aarch64.dmg) | macOS Apple Silicon (M1/M2/M3/M4) |
+| [Donut_x64.dmg](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.19.0_x64.dmg) | macOS Intel |
 
 > **Which macOS version?** If your Mac is from 2020 or later, use **aarch64** (Apple Silicon). Older Macs use **x64** (Intel).
 
@@ -33,9 +33,9 @@ Choose the right file for your system:
 
 | File | Description |
 |---|---|
-| [Donut_amd64.deb](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.18.0_amd64.deb) | Debian / Ubuntu / Mint |
-| [Donut_x86_64.rpm](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut-0.18.0-1.x86_64.rpm) | Fedora / RHEL / openSUSE |
-| [Donut_amd64.AppImage](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.18.0_amd64.AppImage) | Universal (any distro) |
+| [Donut_amd64.deb](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.19.0_amd64.deb) | Debian / Ubuntu / Mint |
+| [Donut_x86_64.rpm](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut-0.19.0-1.x86_64.rpm) | Fedora / RHEL / openSUSE |
+| [Donut_amd64.AppImage](https://github.com/ToRaNek/donutbrowser-fixed/releases/latest/download/Donut_0.19.0_amd64.AppImage) | Universal (any distro) |
 
 > **Which Linux version?** Use **.deb** for Ubuntu/Debian, **.rpm** for Fedora/RHEL, or **.AppImage** if unsure (works everywhere).
 
@@ -45,7 +45,7 @@ Choose the right file for your system:
 If the AppImage segfaults on launch, install **libfuse2** (`sudo apt install libfuse2` / `yay -S libfuse2` / `sudo dnf install fuse-libs`), or bypass FUSE entirely:
 
 ```bash
-APPIMAGE_EXTRACT_AND_RUN=1 ./Donut_0.18.0_amd64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./Donut_0.19.0_amd64.AppImage
 ```
 
 If that gives an EGL display error, try adding `WEBKIT_DISABLE_DMABUF_RENDERER=1` or `GDK_BACKEND=x11` to the command above. If issues persist, the **.deb** / **.rpm** packages are a more reliable alternative.
