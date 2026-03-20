@@ -13,8 +13,10 @@ use tokio::process::Command as TokioCommand;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
+pub type WayfernConfig = ChromiumConfig;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct WayfernConfig {
+pub struct ChromiumConfig {
   #[serde(default)]
   pub seed: Option<u32>, // --fingerprint=<seed>
   #[serde(default)]
@@ -68,7 +70,9 @@ struct WayfernManagerInner {
   instances: HashMap<String, WayfernInstance>,
 }
 
-pub struct WayfernManager {
+pub type WayfernManager = ChromiumManager;
+
+pub struct ChromiumManager {
   inner: Arc<AsyncMutex<WayfernManagerInner>>,
   http_client: Client,
 }
@@ -81,7 +85,7 @@ struct CdpTarget {
   websocket_debugger_url: Option<String>,
 }
 
-impl WayfernManager {
+impl ChromiumManager {
   fn new() -> Self {
     Self {
       inner: Arc::new(AsyncMutex::new(WayfernManagerInner {
@@ -198,7 +202,7 @@ impl WayfernManager {
   }
 
   #[allow(clippy::too_many_arguments)]
-  pub async fn launch_wayfern(
+  pub async fn launch_chromium(
     &self,
     _app_handle: &AppHandle,
     profile: &BrowserProfile,
@@ -382,7 +386,7 @@ impl WayfernManager {
     })
   }
 
-  pub async fn stop_wayfern(
+  pub async fn stop_chromium(
     &self,
     id: &str,
   ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -420,7 +424,7 @@ impl WayfernManager {
     url: &str,
   ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let instance = self
-      .find_wayfern_by_profile(profile_path)
+      .find_chromium_by_profile(profile_path)
       .await
       .ok_or("Wayfern instance not found for profile")?;
 
@@ -470,7 +474,7 @@ impl WayfernManager {
     None
   }
 
-  pub async fn find_wayfern_by_profile(&self, profile_path: &str) -> Option<WayfernLaunchResult> {
+  pub async fn find_chromium_by_profile(&self, profile_path: &str) -> Option<WayfernLaunchResult> {
     use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
     let mut inner = self.inner.lock().await;
@@ -527,7 +531,7 @@ impl WayfernManager {
     // If not found in in-memory instances, scan system processes.
     // This handles the case where the GUI was restarted but Wayfern is still running.
     if let Some((pid, found_profile_path, cdp_port)) =
-      Self::find_wayfern_process_by_profile(&target_path)
+      Self::find_chromium_process_by_profile(&target_path)
     {
       log::info!(
         "Found running Wayfern process (PID: {}) for profile path via system scan",
@@ -559,7 +563,7 @@ impl WayfernManager {
   }
 
   /// Scan system processes to find a Wayfern/Chromium process using a specific profile path
-  fn find_wayfern_process_by_profile(
+  fn find_chromium_process_by_profile(
     target_path: &std::path::Path,
   ) -> Option<(u32, String, Option<u16>)> {
     use sysinfo::{ProcessRefreshKind, RefreshKind, System};
@@ -623,7 +627,7 @@ impl WayfernManager {
   }
 
   #[allow(dead_code)]
-  pub async fn launch_wayfern_profile(
+  pub async fn launch_chromium_profile(
     &self,
     app_handle: &AppHandle,
     profile: &BrowserProfile,
@@ -637,13 +641,13 @@ impl WayfernManager {
 
     std::fs::create_dir_all(&profile_path)?;
 
-    if let Some(existing) = self.find_wayfern_by_profile(&profile_path_str).await {
+    if let Some(existing) = self.find_chromium_by_profile(&profile_path_str).await {
       log::info!("Stopping existing Wayfern instance for profile");
-      self.stop_wayfern(&existing.id).await?;
+      self.stop_chromium(&existing.id).await?;
     }
 
     self
-      .launch_wayfern(
+      .launch_chromium(
         app_handle,
         profile,
         &profile_path_str,
@@ -685,5 +689,5 @@ impl WayfernManager {
 }
 
 lazy_static::lazy_static! {
-  static ref WAYFERN_MANAGER: WayfernManager = WayfernManager::new();
+  static ref WAYFERN_MANAGER: ChromiumManager = ChromiumManager::new();
 }

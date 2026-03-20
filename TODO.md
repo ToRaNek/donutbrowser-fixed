@@ -1,72 +1,127 @@
 # Improvements TODO
 
-## Cross-OS Fingerprint Detection Issues
+## Pixelscan Detection Issues
+
+### Current Status
+On Linux with cross-OS profiles (macOS/Windows), pixelscan reports "Masking detected" with:
+- `fonts: false` — Font set doesn't match claimed OS
+- `noNoise: false` — Canvas noise pattern detected
+- `webglStatus: ["-","-","-"]` — WebGL data empty
+- `jsModifyDetected: true` — JS API modifications detected
+
+The correct OS is shown (e.g., "Chrome 144 on Mac OS") — cross-OS spoofing works, but the fingerprint details are flagged.
 
 ### Chromium (fingerprint-chromium) on Windows
 - **Bug**: Setting macOS fingerprint on Windows still shows "Windows" on pixelscan
-- **Cause**: `--fingerprint-platform=macos` flag may not be passed correctly, or the Windows build of fingerprint-chromium doesn't fully support cross-OS platform spoofing
-- **Fix needed**: Debug the actual CLI args passed to the binary on Windows and verify fingerprint-chromium Windows builds support `--fingerprint-platform`
+- `--fingerprint-platform=macos` may not work on Windows builds
+- Need to debug actual CLI args on Windows platform
 
-### Fonts mismatch (`fonts: false` on pixelscan)
-- **Cause**: The host OS has Linux/Windows fonts installed, but the fingerprint claims macOS (or vice versa). Pixelscan probes for OS-specific fonts (e.g. San Francisco on macOS, Segoe UI on Windows) and detects the mismatch.
-- **Fix**: Bundle OS-specific font lists per platform and load them via Camoufox's custom font system or fingerprint-chromium's font spoofing. Camoufox already has a `fonts.json` data file and custom font loading support — extend it with per-OS font sets.
+---
 
-### WebGL empty (`webglStatus: ["-", "-", "-"]`)
-- **Cause**: WebGL data (vendor, renderer, extensions) is not populated in cross-OS profiles. The GPU on the host doesn't match the spoofed OS, and no fallback WebGL data is injected.
-- **Fix**: Use the `webgl_data.db` database already embedded in Camoufox to inject realistic WebGL parameters matching the target OS. For fingerprint-chromium, investigate if `--fingerprint=<seed>` generates WebGL data or if additional flags are needed.
+## Root Cause Analysis
 
-### Canvas noise detected (`noNoise: false`)
-- **Cause**: Canvas fingerprint noise is applied but pixelscan detects the noise pattern as artificial (statistical analysis of pixel variations).
-- **Fix**: This is an arms race issue. Camoufox uses C++-level canvas injection which is harder to detect than JS-level. For fingerprint-chromium, the noise is seed-based and deterministic. Improving this requires changes in the upstream browser forks.
+### fonts: false
+**Cause:** Host OS has Linux/Windows fonts, but fingerprint claims macOS (or vice versa). Pixelscan probes for OS-specific fonts using `measureText()` and CSS fallback measurement, then checks if fonts match claimed OS.
 
-### JS modification detected (`jsModifyDetected: true`)
-- **Cause**: Camoufox (Firefox) modifies JS APIs at the C++ level, but some detection scripts still identify inconsistencies in the prototype chain or timing differences.
-- **Fix**: Upstream Camoufox issue. Monitor Camoufox releases for improvements. For fingerprint-chromium, this should not appear since spoofing is at the Chromium source level.
+**How commercial browsers solve it:**
+- **Camoufox** bundles real font files for all 3 OSes + uses fontconfig whitelisting to hide host OS fonts
+- **Octo Browser** uses "fingerprints from real devices" with curated font sets
+- **Multilogin** is the only one doing true cross-OS font emulation
+
+**Fix options:**
+1. Bundle per-OS font files (macOS: San Francisco, Helvetica Neue; Windows: Segoe UI, Calibri) and load them via fontconfig whitelisting
+2. For fingerprint-chromium: font metrics are perturbed by the seed at C++ level, but actual font rendering still uses host fonts. Need to install target OS fonts on host system for true cross-OS
+3. Camoufox already has this infrastructure (`fonts.json`, `FONTCONFIG_PATH`) — verify it's working
+
+### noNoise: false
+**Cause:** Canvas noise is applied but pixelscan detects it as artificial via:
+- Double-render comparison (same canvas drawn twice, hashes differ = noise)
+- Known-pixel verification (fill exact RGBA, check for deviation)
+- ML database comparison (hash matches no known real device)
+
+**How commercial browsers solve it:**
+- **Camoufox** uses closed-source Skia C++ patch that modifies anti-aliasing algorithm (not pixel values). Uses `canvas:aaOffset` (-50 to 50) for deterministic, session-consistent output
+- **fingerprint-chromium** applies seed-deterministic pixel noise at C++ level (improved in Chrome 142)
+- **Kameleo** maps canvas output to match real device configurations
+
+**Current code:**
+- Camoufox: `canvas:aaOffset` correctly set in `config.rs:399-403`
+- fingerprint-chromium: relies on `--fingerprint=<seed>` for C++ level noise
+
+**Fix:** This is largely an upstream issue. Ensure using fingerprint-chromium >= 142. The double-render test should pass (deterministic), but ML comparison may fail. No easy fix without upstream changes.
+
+### webglStatus: ["-","-","-"]
+**Cause:** WebGL vendor/renderer/extensions not populated in cross-OS profiles.
+
+**How it works:**
+- Pixelscan checks: unmasked vendor (`gl.getParameter(0x9245)`), unmasked renderer (`gl.getParameter(0x9246)`), WebGL render hash
+- Cross-validates against UA OS, GPU capabilities, extensions, shader precision
+
+**How commercial browsers solve it:**
+- **Camoufox** samples from `webgl_data.db` (SQLite) with OS-weighted probabilities
+- **fingerprint-chromium** auto-generates WebGL from seed since v139, fully in v144
+
+**Fix:** fingerprint-chromium v144 should handle this natively via seed. If empty, check that `--disable-spoofing=gpu` is NOT being set. The `--fingerprint=<seed>` flag should auto-generate GPU data.
+
+### jsModifyDetected: true
+**Cause:** Detection scripts check for JS API modifications via:
+- `Function.prototype.toString` analysis
+- `Object.getOwnPropertyDescriptor` checks
+- Worker scope comparison
+- Proxy trap detection
+- Error stack trace analysis
+
+**How commercial browsers solve it:**
+- All modifications at C++ engine level — JS sees authentic native functions
+- `Object.getOwnPropertyDescriptor` returns `undefined` for native properties
+- Values match in Worker contexts (C++ affects all contexts)
+
+**For fingerprint-chromium:** All spoofing is C++ level. `jsModifyDetected` should be FALSE. If it appears:
+1. Check no browser extensions are injecting JS (the `font-spoof` extension in `src-tauri/extensions/` exists but should NOT be loaded)
+2. Check no CDP `Runtime.evaluate` calls are modifying JS APIs
+3. The `--disable-non-proxied-udp` flag is fine (standard Chromium)
+
+**For Camoufox:** Same — all C++ level. Should not trigger. If it does, check for extensions modifying JS.
+
+---
+
+## Priority Actions
+
+### P0 — Investigate jsModifyDetected on fingerprint-chromium
+fingerprint-chromium does all spoofing at C++ level. `jsModifyDetected: true` should not happen. Steps:
+1. Launch a profile with NO extensions, NO proxy
+2. Check if jsModifyDetected is still true
+3. If yes, it's a fingerprint-chromium upstream issue
+4. If no, an extension or CDP call is the cause
+
+### P1 — Cross-OS font matching
+The hardest problem. Options ranked by effort:
+1. **Low effort:** Only allow profiles matching host OS for Chromium. Use Camoufox for cross-OS (it has font bundling)
+2. **Medium effort:** Install target OS fonts on the host. For Linux: install macOS/Windows core fonts via fontconfig
+3. **High effort:** Bundle font files per OS in the app, set up fontconfig whitelisting for fingerprint-chromium (similar to Camoufox)
+
+### P2 — WebGL on cross-OS
+Verify fingerprint-chromium v144 generates WebGL data from seed. If it doesn't:
+- Check if `--disable-gpu` or `--disable-spoofing=gpu` is accidentally set
+- Try without `--headless` (WebGL may need GPU access)
+- As fallback, for versions < 144, pass `--fingerprint-gpu-vendor` and `--fingerprint-gpu-renderer`
+
+### P3 — Canvas noise
+Upstream limitation for both engines. Monitor fingerprint-chromium and Camoufox releases for improvements. No easy local fix.
+
+---
 
 ## Feature Improvements
 
 ### Rename "Wayfern" to "Chromium" in UI
-- The internal identifier `"wayfern"` is still used everywhere in the codebase and displayed in the UI
-- All i18n locale files reference "Wayfern" (en.json, fr.json, es.json, etc.)
-- Should be renamed to "Chromium" or "Fingerprint Chromium" for clarity
-- Note: changing the internal `"wayfern"` string requires profile migration (existing profiles store `browser: "wayfern"`)
+- Internal identifier still uses `"wayfern"` in some places
+- i18n locale files partially updated
+- Profile migration needed (existing profiles store `browser: "wayfern"`)
 
-### Auto-download and extraction of fingerprint-chromium
-- The download from GitHub releases works but extraction sometimes fails silently
-- The tar.xz archive extracts into a subdirectory (`ungoogled-chromium-X.X.X-1-x86_64_linux/`) that needs to be flattened
-- Need to add post-extraction logic to move files from the subdirectory to the version root
-- Also need to handle different archive formats per platform (tar.xz on Linux, zip on Windows, dmg on macOS)
+### Auto-download extraction fix
+- tar.xz archives extract into subdirectory, needs flattening
+- Handle per-platform archive formats (tar.xz Linux, zip Windows, dmg macOS)
 
-### Client Hints consistency
-- On Windows with Chromium, `identicalCH: false` was reported — Client Hints headers don't match the User-Agent
-- fingerprint-chromium should handle this via the seed, but cross-OS may break CH consistency
-- Investigate if `--fingerprint-brand` and `--fingerprint-brand-version` need to be explicitly set
-
-### Geolocation spoofing improvements
-- Current implementation uses IP-based geolocation via GeoIP database
-- Timezone is set via `--timezone` flag for fingerprint-chromium and via config for Camoufox
-- Could improve by also matching locale/language to the proxy's geographic location automatically
-
-### Per-OS font databases
-- Build font list databases for Windows, macOS, and Linux
-- When creating a cross-OS profile, inject the correct font list for the target OS
-- Camoufox already supports custom font loading — leverage this
-
-### WebGL spoofing per OS
-- Build a database of realistic GPU vendor/renderer strings per OS
-- Windows: "ANGLE (NVIDIA GeForce RTX 3060)", "ANGLE (Intel UHD 630)", etc.
-- macOS: "Apple M1", "Apple M2 Pro", "Intel Iris Plus", etc.
-- Linux: "Mesa Intel UHD 630", "NVIDIA GeForce GTX 1080/PCIe/SSE2", etc.
-- Inject matching WebGL data when creating cross-OS profiles
-
-## Architecture Improvements
-
-### Decouple fingerprint generation from browser engine
-- Currently Camoufox (Firefox) has its own Bayesian network generator, and fingerprint-chromium uses seed-based generation
-- Could unify into a single fingerprint generation system that produces consistent data for both engines
-- The Camoufox Bayesian network data could be used to generate richer fingerprints for fingerprint-chromium profiles too
-
-### Profile migration system
-- No formal migration system exists for profile config changes
-- Old profiles with Wayfern JSON blob fingerprints should be automatically migrated to seed-based config
-- Could add a version field to profile metadata and run migrations on load
+### Geolocation improvements
+- Auto-match locale/language to proxy geographic location
+- Already implemented via GeoIP database, but could be improved
