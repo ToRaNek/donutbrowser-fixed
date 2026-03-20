@@ -62,6 +62,7 @@ impl BrowserVersionManager {
         // Brave supports all platforms and architectures
         Ok(true)
       }
+      "camoufox" => Ok(true),
       "chromium" | "wayfern" => {
         // fingerprint-chromium supports Linux x64, Windows x64, and macOS (universal)
         Ok(matches!(
