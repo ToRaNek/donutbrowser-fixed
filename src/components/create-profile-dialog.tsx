@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { GoPlus } from "react-icons/go";
 import { LuCheck, LuChevronsUpDown } from "react-icons/lu";
+import { ChromiumConfigForm } from "@/components/chromium-config-form";
 import { LoadingButton } from "@/components/loading-button";
 import { ProxyFormDialog } from "@/components/proxy-form-dialog";
 import { SharedCamoufoxConfigForm } from "@/components/shared-camoufox-config-form";
@@ -43,7 +44,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { WayfernConfigForm } from "@/components/wayfern-config-form";
 import { useBrowserDownload } from "@/hooks/use-browser-download";
 import { useProxyEvents } from "@/hooks/use-proxy-events";
 import { useVpnEvents } from "@/hooks/use-vpn-events";
@@ -53,8 +53,8 @@ import type {
   BrowserReleaseTypes,
   CamoufoxConfig,
   CamoufoxOS,
-  WayfernConfig,
-  WayfernOS,
+  ChromiumConfig,
+  ChromiumOS,
 } from "@/types";
 
 const getCurrentOS = (): CamoufoxOS => {
@@ -67,7 +67,7 @@ const getCurrentOS = (): CamoufoxOS => {
 
 import { RippleButton } from "./ui/ripple";
 
-type BrowserTypeString = "camoufox" | "wayfern";
+type BrowserTypeString = "camoufox" | "chromium";
 
 interface CreateProfileDialogProps {
   isOpen: boolean;
@@ -80,7 +80,7 @@ interface CreateProfileDialogProps {
     proxyId?: string;
     vpnId?: string;
     camoufoxConfig?: CamoufoxConfig;
-    wayfernConfig?: WayfernConfig;
+    chromiumConfig?: ChromiumConfig;
     groupId?: string;
     extensionGroupId?: string;
     ephemeral?: boolean;
@@ -100,8 +100,8 @@ const browserOptions: BrowserOption[] = [
     label: "Camoufox",
   },
   {
-    value: "wayfern",
-    label: "Wayfern",
+    value: "chromium",
+    label: "Chromium",
   },
 ];
 
@@ -131,9 +131,9 @@ export function CreateProfileDialog({
     os: getCurrentOS(), // Default to current OS
   }));
 
-  // Wayfern anti-detect states
-  const [wayfernConfig, setWayfernConfig] = useState<WayfernConfig>(() => ({
-    os: getCurrentOS() as WayfernOS, // Default to current OS
+  // Chromium anti-detect states
+  const [chromiumConfig, setChromiumConfig] = useState<ChromiumConfig>(() => ({
+    os: getCurrentOS() as ChromiumOS, // Default to current OS
   }));
 
   // Handle browser selection from the initial screen
@@ -288,8 +288,8 @@ export function CreateProfileDialog({
       if (selectedBrowser) {
         void loadReleaseTypes(selectedBrowser);
       }
-      // Check and download GeoIP database if needed for Camoufox or Wayfern
-      if (selectedBrowser === "camoufox" || selectedBrowser === "wayfern") {
+      // Check and download GeoIP database if needed for Camoufox or Chromium
+      if (selectedBrowser === "camoufox" || selectedBrowser === "chromium") {
         void checkAndDownloadGeoIPDatabase();
       }
     }
@@ -370,25 +370,25 @@ export function CreateProfileDialog({
       isVpnSelection && selectedProxyId ? selectedProxyId.slice(4) : undefined;
     try {
       if (activeTab === "anti-detect") {
-        // Anti-detect browser - check if Wayfern or Camoufox is selected
-        if (selectedBrowser === "wayfern") {
-          const bestWayfernVersion = getCreatableVersion("wayfern");
-          if (!bestWayfernVersion) {
-            console.error("No Wayfern version available");
+        // Anti-detect browser - check if Chromium or Camoufox is selected
+        if (selectedBrowser === "chromium") {
+          const bestChromiumVersion = getCreatableVersion("chromium");
+          if (!bestChromiumVersion) {
+            console.error("No Chromium version available");
             return;
           }
 
           // The fingerprint will be generated at launch time by the Rust backend
-          const finalWayfernConfig = { ...wayfernConfig };
+          const finalChromiumConfig = { ...chromiumConfig };
 
           await onCreateProfile({
             name: profileName.trim(),
-            browserStr: "wayfern" as BrowserTypeString,
-            version: bestWayfernVersion.version,
-            releaseType: bestWayfernVersion.releaseType,
+            browserStr: "chromium" as BrowserTypeString,
+            version: bestChromiumVersion.version,
+            releaseType: bestChromiumVersion.releaseType,
             proxyId: resolvedProxyId,
             vpnId: resolvedVpnId,
-            wayfernConfig: finalWayfernConfig,
+            chromiumConfig: finalChromiumConfig,
             groupId:
               selectedGroupId !== "default" ? selectedGroupId : undefined,
             extensionGroupId: selectedExtensionGroupId,
@@ -469,8 +469,8 @@ export function CreateProfileDialog({
       geoip: true, // Reset to automatic geoip
       os: getCurrentOS(), // Reset to current OS
     });
-    setWayfernConfig({
-      os: getCurrentOS() as WayfernOS, // Reset to current OS
+    setChromiumConfig({
+      os: getCurrentOS() as ChromiumOS, // Reset to current OS
     });
     setEphemeral(false);
     onClose();
@@ -480,8 +480,8 @@ export function CreateProfileDialog({
     setCamoufoxConfig((prev) => ({ ...prev, [key]: value }));
   };
 
-  const updateWayfernConfig = (key: keyof WayfernConfig, value: unknown) => {
-    setWayfernConfig((prev) => ({ ...prev, [key]: value }));
+  const updateChromiumConfig = (key: keyof ChromiumConfig, value: unknown) => {
+    setChromiumConfig((prev) => ({ ...prev, [key]: value }));
   };
 
   // Check if browser version is downloaded and available
@@ -529,7 +529,7 @@ export function CreateProfileDialog({
               ? t("createProfile.title")
               : t("createProfile.configureTitle", {
                   browser:
-                    selectedBrowser === "wayfern"
+                    selectedBrowser === "chromium"
                       ? t("createProfile.chromiumLabel")
                       : t("createProfile.firefoxLabel"),
                 })}
@@ -551,15 +551,15 @@ export function CreateProfileDialog({
                     <TabsContent value="anti-detect" className="mt-0 space-y-6">
                       {/* Anti-Detect Browser Selection */}
                       <div className="space-y-3 pt-8">
-                        {/* Wayfern (Chromium) - First */}
+                        {/* Chromium - First */}
                         <Button
-                          onClick={() => handleBrowserSelect("wayfern")}
+                          onClick={() => handleBrowserSelect("chromium")}
                           className="flex gap-3 justify-start items-center p-4 w-full h-16 border-2 transition-colors hover:border-primary/50"
                           variant="outline"
                         >
                           <div className="flex justify-center items-center w-8 h-8">
                             {(() => {
-                              const IconComponent = getBrowserIcon("wayfern");
+                              const IconComponent = getBrowserIcon("chromium");
                               return IconComponent ? (
                                 <IconComponent className="w-6 h-6" />
                               ) : null;
@@ -693,10 +693,10 @@ export function CreateProfileDialog({
                           </p>
                         </div>
 
-                        {selectedBrowser === "wayfern" ? (
-                          // Wayfern Configuration
+                        {selectedBrowser === "chromium" ? (
+                          // Chromium Configuration
                           <div className="space-y-6">
-                            {/* Wayfern Download Status */}
+                            {/* Chromium Download Status */}
                             {isLoadingReleaseTypes && (
                               <div className="flex gap-3 items-center p-3 rounded-md border">
                                 <div className="w-4 h-4 rounded-full border-2 animate-spin border-muted/40 border-t-primary" />
@@ -724,38 +724,38 @@ export function CreateProfileDialog({
                             )}
                             {!isLoadingReleaseTypes &&
                               !releaseTypesError &&
-                              !getBestAvailableVersion("wayfern") && (
+                              !getBestAvailableVersion("chromium") && (
                                 <div className="flex gap-3 items-center p-3 rounded-md border border-warning/50 bg-warning/10">
                                   <p className="text-sm text-warning">
-                                    Wayfern is not available on your platform
+                                    Chromium is not available on your platform
                                     yet.
                                   </p>
                                 </div>
                               )}
                             {!isLoadingReleaseTypes &&
                               !releaseTypesError &&
-                              !isBrowserCurrentlyDownloading("wayfern") &&
-                              !isBrowserVersionAvailable("wayfern") &&
-                              getBestAvailableVersion("wayfern") && (
+                              !isBrowserCurrentlyDownloading("chromium") &&
+                              !isBrowserVersionAvailable("chromium") &&
+                              getBestAvailableVersion("chromium") && (
                                 <div className="flex gap-3 items-center p-3 rounded-md border">
                                   <p className="text-sm text-muted-foreground">
                                     {(() => {
                                       const bestVersion =
-                                        getBestAvailableVersion("wayfern");
-                                      return `Wayfern version (${bestVersion?.version}) needs to be downloaded`;
+                                        getBestAvailableVersion("chromium");
+                                      return `Chromium version (${bestVersion?.version}) needs to be downloaded`;
                                     })()}
                                   </p>
                                   <LoadingButton
-                                    onClick={() => handleDownload("wayfern")}
+                                    onClick={() => handleDownload("chromium")}
                                     isLoading={isBrowserCurrentlyDownloading(
-                                      "wayfern",
+                                      "chromium",
                                     )}
                                     size="sm"
                                     disabled={isBrowserCurrentlyDownloading(
-                                      "wayfern",
+                                      "chromium",
                                     )}
                                   >
-                                    {isBrowserCurrentlyDownloading("wayfern")
+                                    {isBrowserCurrentlyDownloading("chromium")
                                       ? "Downloading..."
                                       : "Download"}
                                   </LoadingButton>
@@ -763,36 +763,36 @@ export function CreateProfileDialog({
                               )}
                             {!isLoadingReleaseTypes &&
                               !releaseTypesError &&
-                              !isBrowserCurrentlyDownloading("wayfern") &&
-                              isBrowserVersionAvailable("wayfern") && (
+                              !isBrowserCurrentlyDownloading("chromium") &&
+                              isBrowserVersionAvailable("chromium") && (
                                 <div className="p-3 text-sm rounded-md border text-muted-foreground">
                                   {(() => {
                                     const bestVersion =
-                                      getBestAvailableVersion("wayfern");
-                                    return `✓ Wayfern version (${bestVersion?.version}) is available`;
+                                      getBestAvailableVersion("chromium");
+                                    return `Chromium version (${bestVersion?.version}) is available`;
                                   })()}
                                 </div>
                               )}
-                            {isBrowserCurrentlyDownloading("wayfern") && (
+                            {isBrowserCurrentlyDownloading("chromium") && (
                               <div className="p-3 text-sm rounded-md border text-muted-foreground">
                                 {(() => {
                                   const bestVersion =
-                                    getBestAvailableVersion("wayfern");
-                                  return `Downloading Wayfern version (${bestVersion?.version})...`;
+                                    getBestAvailableVersion("chromium");
+                                  return `Downloading Chromium version (${bestVersion?.version})...`;
                                 })()}
                               </div>
                             )}
 
-                            <WayfernConfigForm
-                              config={wayfernConfig}
-                              onConfigChange={updateWayfernConfig}
+                            <ChromiumConfigForm
+                              config={chromiumConfig}
+                              onConfigChange={updateChromiumConfig}
                               isCreating
                               crossOsUnlocked={crossOsUnlocked}
                               limitedMode={!crossOsUnlocked}
                               profileVersion={
-                                getBestAvailableVersion("wayfern")?.version
+                                getBestAvailableVersion("chromium")?.version
                               }
-                              profileBrowser="wayfern"
+                              profileBrowser="chromium"
                             />
                           </div>
                         ) : selectedBrowser === "camoufox" ? (

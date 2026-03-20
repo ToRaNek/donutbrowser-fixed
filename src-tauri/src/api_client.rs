@@ -1076,8 +1076,8 @@ impl ApiClient {
     Ok(compatible_releases)
   }
 
-  /// Check if a fingerprint-chromium (Wayfern) release has compatible assets for the given platform and architecture
-  fn has_compatible_wayfern_asset(
+  /// Check if a fingerprint-chromium release has compatible assets for the given platform and architecture
+  fn has_compatible_fingerprint_chromium_asset(
     assets: &[crate::browser::GithubAsset],
     os: &str,
     arch: &str,
@@ -1085,7 +1085,9 @@ impl ApiClient {
     match (os, arch) {
       ("linux", "x64") => assets.iter().any(|asset| {
         let name = asset.name.to_lowercase();
-        name.starts_with("ungoogled-chromium") && name.contains("x86_64") && name.ends_with("_linux.tar.xz")
+        name.starts_with("ungoogled-chromium")
+          && name.contains("x86_64")
+          && name.ends_with("_linux.tar.xz")
       }),
       ("windows", "x64") => assets.iter().any(|asset| {
         let name = asset.name.to_lowercase();
@@ -1099,15 +1101,23 @@ impl ApiClient {
     }
   }
 
-  pub async fn fetch_wayfern_releases_with_caching(
+  pub async fn fetch_fingerprint_chromium_releases_with_caching(
     &self,
     no_caching: bool,
   ) -> Result<Vec<GithubRelease>, Box<dyn std::error::Error + Send + Sync>> {
-    // Check cache first (unless bypassing)
+    // Check cache first (unless bypassing) - check both "wayfern" and "chromium" cache keys
     if !no_caching {
+      if let Some(cached_releases) = self.load_cached_github_releases("chromium_fp") {
+        log::info!(
+          "Using cached fingerprint-chromium releases, count: {}",
+          cached_releases.len()
+        );
+        return Ok(cached_releases);
+      }
+      // Backward compat: check legacy "wayfern" cache key
       if let Some(cached_releases) = self.load_cached_github_releases("wayfern") {
         log::info!(
-          "Using cached Wayfern releases, count: {}",
+          "Using cached fingerprint-chromium releases (legacy wayfern key), count: {}",
           cached_releases.len()
         );
         return Ok(cached_releases);
@@ -1119,8 +1129,7 @@ impl ApiClient {
       "{}/repos/adryfish/fingerprint-chromium/releases",
       self.github_api_base
     );
-    let releases: Vec<GithubRelease> =
-      self.fetch_github_releases_multiple_pages(&base_url).await?;
+    let releases: Vec<GithubRelease> = self.fetch_github_releases_multiple_pages(&base_url).await?;
 
     log::info!(
       "Fetched {} total fingerprint-chromium releases from GitHub",
@@ -1134,7 +1143,9 @@ impl ApiClient {
     // Filter releases that have assets compatible with the current platform
     let mut compatible_releases: Vec<GithubRelease> = releases
       .into_iter()
-      .filter(|release| Self::has_compatible_wayfern_asset(&release.assets, &os, &arch))
+      .filter(|release| {
+        Self::has_compatible_fingerprint_chromium_asset(&release.assets, &os, &arch)
+      })
       .collect();
 
     log::info!(
@@ -1147,10 +1158,13 @@ impl ApiClient {
 
     // Cache the results (unless bypassing cache)
     if !no_caching {
-      if let Err(e) = self.save_cached_github_releases("wayfern", &compatible_releases) {
-        log::error!("Failed to cache Wayfern releases: {e}");
+      if let Err(e) = self.save_cached_github_releases("chromium_fp", &compatible_releases) {
+        log::error!("Failed to cache fingerprint-chromium releases: {e}");
       } else {
-        log::info!("Cached {} Wayfern releases", compatible_releases.len());
+        log::info!(
+          "Cached {} fingerprint-chromium releases",
+          compatible_releases.len()
+        );
       }
     }
 

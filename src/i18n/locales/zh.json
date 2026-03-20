@@ -190,9 +190,9 @@
       "stopFollower": "正在跟随 {{leaderName}} 的操作",
       "desyncedTooltip": "在 {{url}} 同步失败",
       "paidFeature": "同步器是付费功能",
-      "wayfernOnly": "只有 Wayfern 配置文件可以同步",
+      "chromiumOnly": "只有 Chromium 配置文件可以同步",
       "selectFollowers": "选择跟随者配置文件",
-      "selectFollowersDesc": "选择将复制领导者配置文件操作的配置文件。只能选择已停止的 Wayfern 配置文件。",
+      "selectFollowersDesc": "选择将复制领导者配置文件操作的配置文件。只能选择已停止的 Chromium 配置文件。",
       "leader": "领导者",
       "follower": "跟随者",
       "startSession": "开始同步会话",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "防检测浏览器",
       "description": "选择具有防检测功能的浏览器",
-      "chromium": "Wayfern",
+      "chromium": "Chromium",
       "firefox": "Camoufox",
       "badge": "防检测浏览器"
     },
@@ -239,7 +239,7 @@
       "latestDownloading": "正在下载版本 ({{version}})..."
     },
     "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "由 Wayfern 驱动",
+    "chromiumSubtitle": "由 Fingerprint Chromium 驱动",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "由 Camoufox 驱动",
     "camoufoxWarning": "Firefox（Camoufox）由第三方组织维护。在生产环境中，请使用 Chromium。"
@@ -468,8 +468,8 @@
         "webgl": "阻止 WebGL"
       }
     },
-    "wayfern": {
-      "title": "Wayfern 配置",
+    "chromium": {
+      "title": "Chromium 配置",
       "fingerprint": {
         "title": "指纹",
         "randomize": "启动时随机化",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "wayfern": "Wayfern"
+    "chromium": "Chromium"
   },
   "fingerprint": {
     "crossOsWarning": "伪装不同操作系统的指纹不太可靠，因为不可能完美模拟所有底层组件。请谨慎使用。",

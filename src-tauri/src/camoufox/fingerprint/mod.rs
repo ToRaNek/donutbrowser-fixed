@@ -144,9 +144,8 @@ impl FingerprintGenerator {
               "macos" => "Macintosh; Intel Mac OS X 10.15",
               _ => "X11; Linux x86_64",
             };
-            result.fingerprint.navigator.user_agent = format!(
-              "Mozilla/5.0 ({platform}; rv:135.0) Gecko/20100101 Firefox/135.0"
-            );
+            result.fingerprint.navigator.user_agent =
+              format!("Mozilla/5.0 ({platform}; rv:135.0) Gecko/20100101 Firefox/135.0");
             result.fingerprint.navigator.platform = match os_str {
               "windows" => "Win32".to_string(),
               "macos" => "MacIntel".to_string(),

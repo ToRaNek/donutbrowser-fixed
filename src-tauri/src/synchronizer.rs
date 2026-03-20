@@ -110,9 +110,9 @@ impl SynchronizerManager {
       .ok_or("Leader profile not found")?
       .clone();
 
-    if leader.browser != "wayfern" {
+    if leader.browser != "wayfern" && leader.browser != "chromium" {
       return Err(
-        "Synchronizer only supports Wayfern profiles. Camoufox profiles cannot be used."
+        "Synchronizer only supports Chromium profiles. Camoufox profiles cannot be used."
           .to_string(),
       );
     }
@@ -136,9 +136,9 @@ impl SynchronizerManager {
         .find(|p| p.id.to_string() == *fid)
         .ok_or(format!("Follower profile '{fid}' not found"))?
         .clone();
-      if fp.browser != "wayfern" {
+      if fp.browser != "wayfern" && fp.browser != "chromium" {
         return Err(format!(
-          "Profile '{}' is not a Wayfern profile. Only Wayfern profiles can be synchronized.",
+          "Profile '{}' is not a Chromium profile. Only Chromium profiles can be synchronized.",
           fp.name
         ));
       }
@@ -933,7 +933,7 @@ impl SynchronizerManager {
       if attempt > 0 {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
       }
-      let port = crate::wayfern_manager::WayfernManager::instance()
+      let port = crate::wayfern_manager::ChromiumManager::instance()
         .get_cdp_port(&profile_path_str)
         .await;
       if let Some(p) = port {

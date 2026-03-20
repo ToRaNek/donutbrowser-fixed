@@ -10,19 +10,19 @@ use crate::profile::ProfileManager;
 const ACCEPT_TERMS_FLAG: &str = "--accept-terms-and-conditions";
 const MIN_VALID_TIMESTAMP: i64 = 1577836800; // 2020-01-01 00:00:00 UTC
 
-pub struct WayfernTermsManager {
+pub struct ChromiumTermsManager {
   base_dirs: BaseDirs,
 }
 
-impl WayfernTermsManager {
+impl ChromiumTermsManager {
   fn new() -> Self {
     Self {
       base_dirs: BaseDirs::new().expect("Failed to get base directories"),
     }
   }
 
-  pub fn instance() -> &'static WayfernTermsManager {
-    &WAYFERN_TERMS_MANAGER
+  pub fn instance() -> &'static ChromiumTermsManager {
+    &CHROMIUM_TERMS_MANAGER
   }
 
   fn get_license_file_path(&self) -> PathBuf {
@@ -97,16 +97,27 @@ impl WayfernTermsManager {
     timestamp >= MIN_VALID_TIMESTAMP
   }
 
-  pub fn is_wayfern_downloaded(&self) -> bool {
+  pub fn is_chromium_downloaded(&self) -> bool {
     let registry = DownloadedBrowsersRegistry::instance();
-    let versions = registry.get_downloaded_versions("wayfern");
-    !versions.is_empty()
+    let versions = registry.get_downloaded_versions("chromium");
+    if !versions.is_empty() {
+      return true;
+    }
+    // Backward compat: also check legacy "wayfern" key
+    let legacy_versions = registry.get_downloaded_versions("wayfern");
+    !legacy_versions.is_empty()
   }
 
-  fn get_any_wayfern_executable(&self) -> Option<PathBuf> {
-    // First try to get executable from any downloaded Wayfern version
+  fn get_any_chromium_executable(&self) -> Option<PathBuf> {
+    // First try to get executable from any downloaded Chromium version
     let registry = DownloadedBrowsersRegistry::instance();
-    let versions = registry.get_downloaded_versions("wayfern");
+    let mut versions = registry.get_downloaded_versions("chromium");
+    let mut browser_key = "chromium";
+    // Backward compat: also check legacy "wayfern" key
+    if versions.is_empty() {
+      versions = registry.get_downloaded_versions("wayfern");
+      browser_key = "wayfern";
+    }
 
     if versions.is_empty() {
       return None;
@@ -118,15 +129,15 @@ impl WayfernTermsManager {
     // Get binaries directory
     let binaries_dir = ProfileManager::instance().get_binaries_dir();
     let mut browser_dir = binaries_dir;
-    browser_dir.push("wayfern");
+    browser_dir.push(browser_key);
     browser_dir.push(version);
 
-    let browser = create_browser(BrowserType::Wayfern);
+    let browser = create_browser(BrowserType::Chromium);
     browser.get_executable_path(&browser_dir).ok()
   }
 
   pub async fn accept_terms(&self) -> Result<(), String> {
-    let executable_path = self.get_any_wayfern_executable().ok_or_else(|| {
+    let executable_path = self.get_any_chromium_executable().ok_or_else(|| {
       "No Wayfern browser downloaded. Please download a Wayfern browser version first.".to_string()
     })?;
 
@@ -189,7 +200,7 @@ impl WayfernTermsManager {
 }
 
 lazy_static::lazy_static! {
-  static ref WAYFERN_TERMS_MANAGER: WayfernTermsManager = WayfernTermsManager::new();
+  static ref CHROMIUM_TERMS_MANAGER: ChromiumTermsManager = ChromiumTermsManager::new();
 }
 
 #[cfg(test)]
@@ -198,7 +209,7 @@ mod tests {
 
   #[test]
   fn test_license_file_path() {
-    let manager = WayfernTermsManager::new();
+    let manager = ChromiumTermsManager::new();
     let path = manager.get_license_file_path();
     let path_str = path.to_string_lossy();
 
@@ -226,7 +237,7 @@ mod tests {
 
   #[test]
   fn test_is_terms_accepted_no_file() {
-    let manager = WayfernTermsManager::new();
+    let manager = ChromiumTermsManager::new();
     // This test will pass if no license file exists (which is typically the case in test env)
     // The actual behavior depends on whether the file exists
     let _ = manager.is_terms_accepted();

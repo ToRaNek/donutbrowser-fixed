@@ -82,7 +82,7 @@ struct SyncTokenResponse {
 }
 
 #[derive(Debug, Deserialize)]
-struct WayfernTokenResponse {
+struct ChromiumTokenResponse {
   token: String,
   #[serde(rename = "expiresIn")]
   #[allow(dead_code)]
@@ -952,7 +952,7 @@ impl CloudAuthManager {
   }
 
   /// Request a wayfern token from the cloud API. Only succeeds for paid users.
-  pub async fn request_wayfern_token(&self) -> Result<(), String> {
+  pub async fn request_chromium_token(&self) -> Result<(), String> {
     if !self.has_active_paid_subscription().await {
       self.clear_wayfern_token().await;
       return Ok(());
@@ -976,7 +976,7 @@ impl CloudAuthManager {
             return Err(format!("Wayfern token request failed ({status}): {body}"));
           }
 
-          let result: WayfernTokenResponse = response
+          let result: ChromiumTokenResponse = response
             .json()
             .await
             .map_err(|e| format!("Failed to parse wayfern token response: {e}"))?;
@@ -993,7 +993,7 @@ impl CloudAuthManager {
   }
 
   /// Get the current wayfern token, if any.
-  pub async fn get_wayfern_token(&self) -> Option<String> {
+  pub async fn get_chromium_token(&self) -> Option<String> {
     let wt = self.wayfern_token.lock().await;
     wt.clone()
   }
@@ -1061,7 +1061,7 @@ impl CloudAuthManager {
       if wayfern_refresh_counter >= 60 {
         wayfern_refresh_counter = 0;
         if CLOUD_AUTH.has_active_paid_subscription().await {
-          if let Err(e) = CLOUD_AUTH.request_wayfern_token().await {
+          if let Err(e) = CLOUD_AUTH.request_chromium_token().await {
             log::warn!("Failed to refresh wayfern token: {e}");
           }
         } else {
@@ -1106,7 +1106,7 @@ pub async fn cloud_verify_otp(
     }
 
     // Request wayfern token for paid users
-    if let Err(e) = CLOUD_AUTH.request_wayfern_token().await {
+    if let Err(e) = CLOUD_AUTH.request_chromium_token().await {
       log::warn!("Failed to request wayfern token after login: {e}");
     }
   }
@@ -1163,14 +1163,14 @@ pub async fn cloud_has_active_subscription() -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub async fn cloud_get_wayfern_token() -> Result<Option<String>, String> {
-  Ok(CLOUD_AUTH.get_wayfern_token().await)
+pub async fn cloud_get_chromium_token() -> Result<Option<String>, String> {
+  Ok(CLOUD_AUTH.get_chromium_token().await)
 }
 
 #[tauri::command]
-pub async fn cloud_refresh_wayfern_token() -> Result<Option<String>, String> {
-  CLOUD_AUTH.request_wayfern_token().await?;
-  Ok(CLOUD_AUTH.get_wayfern_token().await)
+pub async fn cloud_refresh_chromium_token() -> Result<Option<String>, String> {
+  CLOUD_AUTH.request_chromium_token().await?;
+  Ok(CLOUD_AUTH.get_chromium_token().await)
 }
 
 #[tauri::command]

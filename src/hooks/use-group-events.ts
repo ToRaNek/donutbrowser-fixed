@@ -56,8 +56,9 @@ export function useGroupEvents() {
         });
 
         // Store both listeners for cleanup
+        const originalGroupsUnlisten = groupsUnlisten;
         groupsUnlisten = () => {
-          groupsUnlisten?.();
+          originalGroupsUnlisten?.();
           profilesUnlisten();
         };
 

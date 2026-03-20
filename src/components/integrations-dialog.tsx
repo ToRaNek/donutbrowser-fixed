@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useWayfernTerms } from "@/hooks/use-wayfern-terms";
+import { useChromiumTerms } from "@/hooks/use-chromium-terms";
 import { showErrorToast, showSuccessToast } from "@/lib/toast-utils";
 import { CopyToClipboard } from "./ui/copy-to-clipboard";
 
@@ -60,7 +60,7 @@ export function IntegrationsDialog({
   const [isApiStarting, setIsApiStarting] = useState(false);
   const [isMcpStarting, setIsMcpStarting] = useState(false);
 
-  const { termsAccepted } = useWayfernTerms();
+  const { termsAccepted } = useChromiumTerms();
 
   const loadSettings = useCallback(async () => {
     try {
@@ -323,7 +323,7 @@ export function IntegrationsDialog({
                     Allow AI assistants like Claude Desktop to control browsers.
                     {!termsAccepted && (
                       <span className="ml-1 text-warning">
-                        (Accept Wayfern terms in Settings first)
+                        (Accept Chromium terms in Settings first)
                       </span>
                     )}
                   </p>

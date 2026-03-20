@@ -1,0 +1,31 @@
+/* macOS font mappings - maps missing macOS fonts to installed Windows equivalents */
+@font-face { font-family: "Helvetica Neue"; src: local("Arial"); font-display: swap; }
+@font-face { font-family: "Helvetica"; src: local("Arial"); font-display: swap; }
+@font-face { font-family: "San Francisco"; src: local("Segoe UI"); font-display: swap; }
+@font-face { font-family: ".AppleSystemUIFont"; src: local("Segoe UI"); font-display: swap; }
+@font-face { font-family: "Lucida Grande"; src: local("Lucida Sans Unicode"); font-display: swap; }
+@font-face { font-family: "Monaco"; src: local("Consolas"); font-display: swap; }
+@font-face { font-family: "Menlo"; src: local("Consolas"); font-display: swap; }
+@font-face { font-family: "Geneva"; src: local("Verdana"); font-display: swap; }
+@font-face { font-family: "Avenir"; src: local("Century Gothic"); font-display: swap; }
+@font-face { font-family: "Avenir Next"; src: local("Century Gothic"); font-display: swap; }
+@font-face { font-family: "Futura"; src: local("Century Gothic"); font-display: swap; }
+@font-face { font-family: "Optima"; src: local("Candara"); font-display: swap; }
+@font-face { font-family: "Gill Sans"; src: local("Calibri"); font-display: swap; }
+@font-face { font-family: "Baskerville"; src: local("Georgia"); font-display: swap; }
+@font-face { font-family: "Hoefler Text"; src: local("Georgia"); font-display: swap; }
+@font-face { font-family: "Cochin"; src: local("Georgia"); font-display: swap; }
+@font-face { font-family: "Didot"; src: local("Georgia"); font-display: swap; }
+@font-face { font-family: "Palatino"; src: local("Palatino Linotype"); font-display: swap; }
+@font-face { font-family: "Rockwell"; src: local("Georgia"); font-display: swap; }
+@font-face { font-family: "Charter"; src: local("Georgia"); font-display: swap; }
+@font-face { font-family: "Damascus"; src: local("Arial"); font-display: swap; }
+@font-face { font-family: "Copperplate"; src: local("Copperplate Gothic Bold"); font-display: swap; }
+@font-face { font-family: "Skia"; src: local("Arial"); font-display: swap; }
+@font-face { font-family: "Phosphate"; src: local("Impact"); font-display: swap; }
+@font-face { font-family: "Chalkboard SE"; src: local("Comic Sans MS"); font-display: swap; }
+@font-face { font-family: "Marker Felt"; src: local("Comic Sans MS"); font-display: swap; }
+@font-face { font-family: "Noteworthy"; src: local("Comic Sans MS"); font-display: swap; }
+@font-face { font-family: "Savoye LET"; src: local("Segoe Script"); font-display: swap; }
+@font-face { font-family: "Snell Roundhand"; src: local("Segoe Script"); font-display: swap; }
+@font-face { font-family: "Zapfino"; src: local("Segoe Script"); font-display: swap; }

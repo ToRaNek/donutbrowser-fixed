@@ -15,7 +15,9 @@ export function useAppUpdateNotifications() {
     useState<AppUpdateProgress | null>(null);
   const [updateReady, setUpdateReady] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
+  const [_dismissedVersion, setDismissedVersion] = useState<string | null>(
+    null,
+  );
   const autoDownloadedVersion = useRef<string | null>(null);
 
   // Ensure we're on the client side to prevent hydration mismatches
@@ -24,23 +26,8 @@ export function useAppUpdateNotifications() {
   }, []);
 
   const checkForAppUpdates = useCallback(async () => {
-    if (!isClient) return;
-
-    try {
-      const update = await invoke<AppUpdateInfo | null>(
-        "check_for_app_updates",
-      );
-
-      // Don't show update if this version was already dismissed
-      if (update && update.new_version !== dismissedVersion) {
-        setUpdateInfo(update);
-      } else if (update) {
-        console.log("Update available but dismissed:", update.new_version);
-      }
-    } catch (error) {
-      console.error("Failed to check for app updates:", error);
-    }
-  }, [isClient, dismissedVersion]);
+    // Auto-update checks disabled — users update manually
+  }, []);
 
   const checkForAppUpdatesManual = useCallback(async () => {
     if (!isClient) return;

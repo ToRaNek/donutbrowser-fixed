@@ -190,9 +190,9 @@
       "stopFollower": "Повторяет действия {{leaderName}}",
       "desyncedTooltip": "Синхронизация не удалась на {{url}}",
       "paidFeature": "Синхронизатор — платная функция",
-      "wayfernOnly": "Синхронизировать можно только профили Wayfern",
+      "chromiumOnly": "Синхронизировать можно только профили Chromium",
       "selectFollowers": "Выберите профили-последователи",
-      "selectFollowersDesc": "Выберите профили, которые будут повторять действия профиля-лидера. Можно выбрать только остановленные профили Wayfern.",
+      "selectFollowersDesc": "Выберите профили, которые будут повторять действия профиля-лидера. Можно выбрать только остановленные профили Chromium.",
       "leader": "Лидер",
       "follower": "Последователь",
       "startSession": "Начать сессию синхронизации",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Антидетект браузер",
       "description": "Выберите браузер с возможностями защиты от обнаружения",
-      "chromium": "Wayfern",
+      "chromium": "Chromium",
       "firefox": "Camoufox",
       "badge": "Антидетект браузер"
     },
@@ -239,7 +239,7 @@
       "latestDownloading": "Загрузка версии ({{version}})..."
     },
     "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "На базе Wayfern",
+    "chromiumSubtitle": "На базе Fingerprint Chromium",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "На базе Camoufox",
     "camoufoxWarning": "Firefox (Camoufox) поддерживается сторонней организацией. Для промышленного использования используйте Chromium."
@@ -468,8 +468,8 @@
         "webgl": "Блокировать WebGL"
       }
     },
-    "wayfern": {
-      "title": "Настройки Wayfern",
+    "chromium": {
+      "title": "Настройки Chromium",
       "fingerprint": {
         "title": "Отпечаток",
         "randomize": "Случайный при запуске",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "wayfern": "Wayfern"
+    "chromium": "Chromium"
   },
   "fingerprint": {
     "crossOsWarning": "Подмена отпечатка для другой операционной системы менее надёжна, так как невозможно идеально имитировать все базовые компоненты. Используйте с осторожностью.",

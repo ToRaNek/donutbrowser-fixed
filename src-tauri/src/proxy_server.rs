@@ -390,10 +390,9 @@ async fn connect_via_socks(
       }
     } else {
       // Resolve domain name to IPv4 address
-      let addrs: Vec<_> =
-        tokio::net::lookup_host(format!("{}:{}", target_host, target_port))
-          .await?
-          .collect();
+      let addrs: Vec<_> = tokio::net::lookup_host(format!("{}:{}", target_host, target_port))
+        .await?
+        .collect();
       addrs
         .iter()
         .find_map(|addr| match addr.ip() {

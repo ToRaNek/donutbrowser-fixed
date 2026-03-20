@@ -190,9 +190,9 @@
       "stopFollower": "Suit les actions de {{leaderName}}",
       "desyncedTooltip": "La synchronisation a échoué à {{url}}",
       "paidFeature": "Le synchroniseur est une fonctionnalité payante",
-      "wayfernOnly": "Seuls les profils Wayfern peuvent être synchronisés",
+      "chromiumOnly": "Seuls les profils Chromium peuvent être synchronisés",
       "selectFollowers": "Sélectionner les profils suiveurs",
-      "selectFollowersDesc": "Choisissez les profils qui reproduiront les actions du profil leader. Seuls les profils Wayfern arrêtés peuvent être sélectionnés.",
+      "selectFollowersDesc": "Choisissez les profils qui reproduiront les actions du profil leader. Seuls les profils Chromium arrêtés peuvent être sélectionnés.",
       "leader": "Leader",
       "follower": "Suiveur",
       "startSession": "Démarrer la session de synchronisation",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Navigateur anti-détection",
       "description": "Choisissez un navigateur avec des capacités anti-détection",
-      "chromium": "Wayfern",
+      "chromium": "Chromium",
       "firefox": "Camoufox",
       "badge": "Navigateur anti-détection"
     },
@@ -239,7 +239,7 @@
       "latestDownloading": "Téléchargement de la version ({{version}})..."
     },
     "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Propulsé par Wayfern",
+    "chromiumSubtitle": "Propulsé par Fingerprint Chromium",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Propulsé par Camoufox",
     "camoufoxWarning": "Firefox (Camoufox) est maintenu par une organisation tierce. Pour une utilisation en production, veuillez utiliser Chromium."
@@ -468,8 +468,8 @@
         "webgl": "Bloquer WebGL"
       }
     },
-    "wayfern": {
-      "title": "Configuration Wayfern",
+    "chromium": {
+      "title": "Configuration Chromium",
       "fingerprint": {
         "title": "Empreinte digitale",
         "randomize": "Randomiser au lancement",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "wayfern": "Wayfern"
+    "chromium": "Chromium"
   },
   "fingerprint": {
     "crossOsWarning": "L'usurpation d'empreinte pour un système d'exploitation différent est moins fiable car il est impossible d'imiter parfaitement tous les composants sous-jacents. À utiliser avec précaution.",

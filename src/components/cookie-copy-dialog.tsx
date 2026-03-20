@@ -78,7 +78,7 @@ export function CookieCopyDialog({
 
   const eligibleSourceProfiles = useMemo(() => {
     return profiles.filter(
-      (p) => p.browser === "wayfern" || p.browser === "camoufox",
+      (p) => p.browser === "chromium" || p.browser === "camoufox",
     );
   }, [profiles]);
 
@@ -87,7 +87,7 @@ export function CookieCopyDialog({
       (p) =>
         selectedProfiles.includes(p.id) &&
         p.id !== sourceProfileId &&
-        (p.browser === "wayfern" || p.browser === "camoufox"),
+        (p.browser === "chromium" || p.browser === "camoufox"),
     );
   }, [profiles, selectedProfiles, sourceProfileId]);
 
@@ -370,7 +370,7 @@ export function CookieCopyDialog({
               {targetProfiles.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {sourceProfileId
-                    ? "No other Wayfern/Camoufox profiles selected"
+                    ? "No other Chromium/Camoufox profiles selected"
                     : "Select a source profile first"}
                 </p>
               ) : (

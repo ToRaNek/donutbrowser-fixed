@@ -14,21 +14,21 @@ pub struct ProxySettings {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BrowserType {
   Camoufox,
-  Wayfern,
+  Chromium,
 }
 
 impl BrowserType {
   pub fn as_str(&self) -> &'static str {
     match self {
       BrowserType::Camoufox => "camoufox",
-      BrowserType::Wayfern => "wayfern",
+      BrowserType::Chromium => "chromium",
     }
   }
 
   pub fn from_str(s: &str) -> Result<Self, String> {
     match s {
       "camoufox" => Ok(BrowserType::Camoufox),
-      "wayfern" => Ok(BrowserType::Wayfern),
+      "chromium" | "wayfern" => Ok(BrowserType::Chromium),
       _ => Err(format!("Unknown browser type: {s}")),
     }
   }
@@ -183,7 +183,7 @@ mod macos {
     Ok(executable_path)
   }
 
-  pub fn get_wayfern_executable_path(
+  pub fn get_chromium_executable_path(
     install_dir: &Path,
   ) -> Result<PathBuf, Box<dyn std::error::Error>> {
     // Wayfern is Chromium-based, look for Chromium.app
@@ -212,7 +212,7 @@ mod macos {
     Ok(executable_path)
   }
 
-  pub fn is_wayfern_version_downloaded(install_dir: &Path) -> bool {
+  pub fn is_chromium_version_downloaded(install_dir: &Path) -> bool {
     // On macOS, check for .app files (Chromium.app)
     if let Ok(entries) = std::fs::read_dir(install_dir) {
       for entry in entries.flatten() {
@@ -290,10 +290,12 @@ mod linux {
     browser_type: &BrowserType,
   ) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let possible_executables = match browser_type {
-      BrowserType::Wayfern => vec![
+      BrowserType::Chromium => vec![
         install_dir.join("chromium"),
         install_dir.join("chrome"),
         install_dir.join("wayfern"),
+        install_dir.join("chromium").join("chromium"),
+        install_dir.join("chromium").join("chrome"),
         install_dir.join("wayfern").join("chromium"),
         install_dir.join("wayfern").join("chrome"),
         install_dir.join("chrome-linux").join("chrome"),
@@ -345,10 +347,12 @@ mod linux {
 
   pub fn is_chromium_version_downloaded(install_dir: &Path, browser_type: &BrowserType) -> bool {
     let possible_executables = match browser_type {
-      BrowserType::Wayfern => vec![
+      BrowserType::Chromium => vec![
         install_dir.join("chromium"),
         install_dir.join("chrome"),
         install_dir.join("wayfern"),
+        install_dir.join("chromium").join("chromium"),
+        install_dir.join("chromium").join("chrome"),
         install_dir.join("wayfern").join("chromium"),
         install_dir.join("wayfern").join("chrome"),
         install_dir.join("chrome-linux").join("chrome"),
@@ -434,11 +438,13 @@ mod windows {
   ) -> Result<PathBuf, Box<dyn std::error::Error>> {
     // On Windows, look for .exe files
     let possible_paths = match browser_type {
-      BrowserType::Wayfern => vec![
+      BrowserType::Chromium => vec![
         install_dir.join("chromium.exe"),
         install_dir.join("chrome.exe"),
         install_dir.join("wayfern.exe"),
         install_dir.join("bin").join("chromium.exe"),
+        install_dir.join("chromium").join("chromium.exe"),
+        install_dir.join("chromium").join("chrome.exe"),
         install_dir.join("wayfern").join("chromium.exe"),
         install_dir.join("wayfern").join("chrome.exe"),
         install_dir.join("chrome-win").join("chrome.exe"),
@@ -469,7 +475,7 @@ mod windows {
       }
     }
 
-    Err("Chromium/Wayfern executable not found in Windows installation directory".into())
+    Err("Chromium executable not found in Windows installation directory".into())
   }
 
   pub fn is_firefox_version_downloaded(install_dir: &Path) -> bool {
@@ -511,11 +517,13 @@ mod windows {
   pub fn is_chromium_version_downloaded(install_dir: &Path, browser_type: &BrowserType) -> bool {
     // On Windows, check for .exe files
     let possible_executables = match browser_type {
-      BrowserType::Wayfern => vec![
+      BrowserType::Chromium => vec![
         install_dir.join("chromium.exe"),
         install_dir.join("chrome.exe"),
         install_dir.join("wayfern.exe"),
         install_dir.join("bin").join("chromium.exe"),
+        install_dir.join("chromium").join("chromium.exe"),
+        install_dir.join("chromium").join("chrome.exe"),
         install_dir.join("wayfern").join("chromium.exe"),
         install_dir.join("wayfern").join("chrome.exe"),
         install_dir.join("chrome-win").join("chrome.exe"),
@@ -645,25 +653,25 @@ impl Browser for CamoufoxBrowser {
   }
 }
 
-/// Wayfern is a Chromium-based anti-detect browser with CDP-based fingerprint injection
-pub struct WayfernBrowser;
+/// Chromium is a Chromium-based anti-detect browser with CDP-based fingerprint injection
+pub struct ChromiumBrowser;
 
-impl WayfernBrowser {
+impl ChromiumBrowser {
   pub fn new() -> Self {
     Self
   }
 }
 
-impl Browser for WayfernBrowser {
+impl Browser for ChromiumBrowser {
   fn get_executable_path(&self, install_dir: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
     #[cfg(target_os = "macos")]
-    return macos::get_wayfern_executable_path(install_dir);
+    return macos::get_chromium_executable_path(install_dir);
 
     #[cfg(target_os = "linux")]
-    return linux::get_chromium_executable_path(install_dir, &BrowserType::Wayfern);
+    return linux::get_chromium_executable_path(install_dir, &BrowserType::Chromium);
 
     #[cfg(target_os = "windows")]
-    return windows::get_chromium_executable_path(install_dir, &BrowserType::Wayfern);
+    return windows::get_chromium_executable_path(install_dir, &BrowserType::Chromium);
 
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     Err("Unsupported platform".into())
@@ -723,16 +731,27 @@ impl Browser for WayfernBrowser {
   }
 
   fn is_version_downloaded(&self, version: &str, binaries_dir: &Path) -> bool {
-    let install_dir = binaries_dir.join("wayfern").join(version);
+    let install_dir = binaries_dir.join("chromium").join(version);
+    // Also check legacy "wayfern" directory for backward compatibility
+    let legacy_install_dir = binaries_dir.join("wayfern").join(version);
 
     #[cfg(target_os = "macos")]
-    return macos::is_wayfern_version_downloaded(&install_dir);
+    {
+      return macos::is_chromium_version_downloaded(&install_dir)
+        || macos::is_chromium_version_downloaded(&legacy_install_dir);
+    }
 
     #[cfg(target_os = "linux")]
-    return linux::is_chromium_version_downloaded(&install_dir, &BrowserType::Wayfern);
+    {
+      return linux::is_chromium_version_downloaded(&install_dir, &BrowserType::Chromium)
+        || linux::is_chromium_version_downloaded(&legacy_install_dir, &BrowserType::Chromium);
+    }
 
     #[cfg(target_os = "windows")]
-    return windows::is_chromium_version_downloaded(&install_dir, &BrowserType::Wayfern);
+    {
+      windows::is_chromium_version_downloaded(&install_dir, &BrowserType::Chromium)
+        || windows::is_chromium_version_downloaded(&legacy_install_dir, &BrowserType::Chromium)
+    }
 
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     false
@@ -767,7 +786,7 @@ impl BrowserFactory {
   pub fn create_browser(&self, browser_type: BrowserType) -> Box<dyn Browser> {
     match browser_type {
       BrowserType::Camoufox => Box::new(CamoufoxBrowser::new()),
-      BrowserType::Wayfern => Box::new(WayfernBrowser::new()),
+      BrowserType::Chromium => Box::new(ChromiumBrowser::new()),
     }
   }
 }
@@ -860,7 +879,7 @@ mod tests {
   fn test_browser_type_conversions() {
     // Test as_str
     assert_eq!(BrowserType::Camoufox.as_str(), "camoufox");
-    assert_eq!(BrowserType::Wayfern.as_str(), "wayfern");
+    assert_eq!(BrowserType::Chromium.as_str(), "chromium");
 
     // Test from_str
     assert_eq!(
@@ -868,8 +887,13 @@ mod tests {
       BrowserType::Camoufox
     );
     assert_eq!(
-      BrowserType::from_str("wayfern").expect("wayfern should be valid"),
-      BrowserType::Wayfern
+      BrowserType::from_str("chromium").expect("chromium should be valid"),
+      BrowserType::Chromium
+    );
+    // Backward compat: "wayfern" should still parse to Chromium
+    assert_eq!(
+      BrowserType::from_str("wayfern").expect("wayfern should be valid for backward compat"),
+      BrowserType::Chromium
     );
 
     // Test invalid browser type - these should properly fail
@@ -884,10 +908,6 @@ mod tests {
 
     assert!(
       BrowserType::from_str("firefox").is_err(),
-      "Removed browser types should return error"
-    );
-    assert!(
-      BrowserType::from_str("chromium").is_err(),
       "Removed browser types should return error"
     );
   }
@@ -931,27 +951,27 @@ mod tests {
   }
 
   #[test]
-  fn test_wayfern_launch_args() {
-    let browser = WayfernBrowser::new();
+  fn test_chromium_launch_args() {
+    let browser = ChromiumBrowser::new();
     let args = browser
       .create_launch_args("/path/to/profile", None, None, None, false)
-      .expect("Failed to create launch args for Wayfern");
+      .expect("Failed to create launch args for Chromium");
 
     assert!(
       args.contains(&"--user-data-dir=/path/to/profile".to_string()),
-      "Wayfern args should contain user-data-dir"
+      "Chromium args should contain user-data-dir"
     );
     assert!(
       args.contains(&"--no-default-browser-check".to_string()),
-      "Wayfern args should contain no-default-browser-check"
+      "Chromium args should contain no-default-browser-check"
     );
     assert!(
       args.contains(&"--disable-background-mode".to_string()),
-      "Wayfern args should contain disable-background-mode"
+      "Chromium args should contain disable-background-mode"
     );
     assert!(
       args.contains(&"--disable-component-update".to_string()),
-      "Wayfern args should contain disable-component-update"
+      "Chromium args should contain disable-component-update"
     );
 
     let args_with_url = browser
@@ -962,10 +982,10 @@ mod tests {
         None,
         false,
       )
-      .expect("Failed to create launch args for Wayfern with URL");
+      .expect("Failed to create launch args for Chromium with URL");
     assert!(
       args_with_url.contains(&"https://example.com".to_string()),
-      "Wayfern args should contain the URL"
+      "Chromium args should contain the URL"
     );
     assert_eq!(
       args_with_url.last().expect("Args should not be empty"),
@@ -975,19 +995,19 @@ mod tests {
     // Test remote debugging
     let args_with_debug = browser
       .create_launch_args("/path/to/profile", None, None, Some(9222), false)
-      .expect("Failed to create launch args for Wayfern with remote debugging");
+      .expect("Failed to create launch args for Chromium with remote debugging");
     assert!(
       args_with_debug.contains(&"--remote-debugging-port=9222".to_string()),
-      "Wayfern args should contain remote debugging port"
+      "Chromium args should contain remote debugging port"
     );
 
     // Test headless mode
     let args_headless = browser
       .create_launch_args("/path/to/profile", None, None, None, true)
-      .expect("Failed to create launch args for Wayfern headless");
+      .expect("Failed to create launch args for Chromium headless");
     assert!(
       args_headless.contains(&"--headless=new".to_string()),
-      "Wayfern args should contain headless flag when requested"
+      "Chromium args should contain headless flag when requested"
     );
   }
 
@@ -1059,9 +1079,9 @@ mod tests {
     assert!(browser.is_version_downloaded("135.0.1", binaries_dir));
     assert!(!browser.is_version_downloaded("999.0", binaries_dir));
 
-    // Test with Wayfern browser
-    let wayfern_dir = binaries_dir.join("wayfern").join("1.0.0");
-    fs::create_dir_all(&wayfern_dir).expect("Failed to create wayfern directory");
+    // Test with Chromium browser
+    let wayfern_dir = binaries_dir.join("chromium").join("1.0.0");
+    fs::create_dir_all(&wayfern_dir).expect("Failed to create chromium directory");
 
     #[cfg(target_os = "macos")]
     {
@@ -1099,14 +1119,14 @@ mod tests {
       fs::write(&executable_path, "mock executable").expect("Failed to write mock chromium.exe");
     }
 
-    let wayfern_browser = WayfernBrowser::new();
+    let chromium_browser = ChromiumBrowser::new();
     assert!(
-      wayfern_browser.is_version_downloaded("1.0.0", binaries_dir),
-      "Wayfern version should be detected as downloaded"
+      chromium_browser.is_version_downloaded("1.0.0", binaries_dir),
+      "Chromium version should be detected as downloaded"
     );
     assert!(
-      !wayfern_browser.is_version_downloaded("9.9.9", binaries_dir),
-      "Non-existent Wayfern version should not be detected as downloaded"
+      !chromium_browser.is_version_downloaded("9.9.9", binaries_dir),
+      "Non-existent Chromium version should not be detected as downloaded"
     );
   }
 

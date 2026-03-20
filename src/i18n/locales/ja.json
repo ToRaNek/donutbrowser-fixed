@@ -190,9 +190,9 @@
       "stopFollower": "{{leaderName}}のアクションを追従中",
       "desyncedTooltip": "{{url}}で同期に失敗しました",
       "paidFeature": "シンクロナイザーは有料機能です",
-      "wayfernOnly": "Wayfernプロフィールのみ同期可能です",
+      "chromiumOnly": "Chromiumプロフィールのみ同期可能です",
       "selectFollowers": "フォロワープロフィールを選択",
-      "selectFollowersDesc": "リーダープロフィールのアクションを複製するプロフィールを選択してください。停止中のWayfernプロフィールのみ選択できます。",
+      "selectFollowersDesc": "リーダープロフィールのアクションを複製するプロフィールを選択してください。停止中のChromiumプロフィールのみ選択できます。",
       "leader": "リーダー",
       "follower": "フォロワー",
       "startSession": "同期セッションを開始",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "アンチ検出ブラウザ",
       "description": "アンチ検出機能を持つブラウザを選択",
-      "chromium": "Wayfern",
+      "chromium": "Chromium",
       "firefox": "Camoufox",
       "badge": "アンチ検出ブラウザ"
     },
@@ -239,7 +239,7 @@
       "latestDownloading": "バージョン ({{version}}) をダウンロード中..."
     },
     "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Wayfern搭載",
+    "chromiumSubtitle": "Fingerprint Chromium搭載",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Camoufox搭載",
     "camoufoxWarning": "Firefox（Camoufox）はサードパーティの組織によって管理されています。本番環境での使用にはChromiumをご利用ください。"
@@ -468,8 +468,8 @@
         "webgl": "WebGLをブロック"
       }
     },
-    "wayfern": {
-      "title": "Wayfern設定",
+    "chromium": {
+      "title": "Chromium設定",
       "fingerprint": {
         "title": "フィンガープリント",
         "randomize": "起動時にランダム化",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "wayfern": "Wayfern"
+    "chromium": "Chromium"
   },
   "fingerprint": {
     "crossOsWarning": "異なるオペレーティングシステムのフィンガープリント偽装は、すべての基盤コンポーネントを完璧に模倣することが不可能なため、信頼性が低くなります。注意してご使用ください。",

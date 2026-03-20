@@ -190,9 +190,9 @@
       "stopFollower": "Seguindo as ações de {{leaderName}}",
       "desyncedTooltip": "A sincronização falhou em {{url}}",
       "paidFeature": "O sincronizador é um recurso pago",
-      "wayfernOnly": "Apenas perfis Wayfern podem ser sincronizados",
+      "chromiumOnly": "Apenas perfis Chromium podem ser sincronizados",
       "selectFollowers": "Selecionar perfis seguidores",
-      "selectFollowersDesc": "Escolha os perfis que replicarão as ações do perfil líder. Apenas perfis Wayfern parados podem ser selecionados.",
+      "selectFollowersDesc": "Escolha os perfis que replicarão as ações do perfil líder. Apenas perfis Chromium parados podem ser selecionados.",
       "leader": "Líder",
       "follower": "Seguidor",
       "startSession": "Iniciar sessão de sincronização",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Navegador Anti-Detecção",
       "description": "Escolha um navegador com capacidades anti-detecção",
-      "chromium": "Wayfern",
+      "chromium": "Chromium",
       "firefox": "Camoufox",
       "badge": "Navegador Anti-Detecção"
     },
@@ -239,7 +239,7 @@
       "latestDownloading": "Baixando versão ({{version}})..."
     },
     "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Desenvolvido com Wayfern",
+    "chromiumSubtitle": "Desenvolvido com Fingerprint Chromium",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Desenvolvido com Camoufox",
     "camoufoxWarning": "O Firefox (Camoufox) é mantido por uma organização terceira. Para uso em produção, utilize o Chromium."
@@ -468,8 +468,8 @@
         "webgl": "Bloquear WebGL"
       }
     },
-    "wayfern": {
-      "title": "Configuração do Wayfern",
+    "chromium": {
+      "title": "Configuração do Chromium",
       "fingerprint": {
         "title": "Impressão Digital",
         "randomize": "Aleatorizar ao Iniciar",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "wayfern": "Wayfern"
+    "chromium": "Chromium"
   },
   "fingerprint": {
     "crossOsWarning": "A falsificação de impressão digital para um sistema operacional diferente é menos confiável porque é impossível imitar perfeitamente todos os componentes subjacentes. Use com cautela.",

@@ -63,7 +63,7 @@ pub struct CreateProfileRequest {
   #[schema(value_type = Object)]
   pub camoufox_config: Option<serde_json::Value>,
   #[schema(value_type = Object)]
-  pub wayfern_config: Option<serde_json::Value>,
+  pub chromium_config: Option<serde_json::Value>,
   pub group_id: Option<String>,
   pub tags: Option<Vec<String>>,
 }
@@ -321,7 +321,7 @@ impl ApiServer {
       .routes(routes!(download_browser_api))
       .routes(routes!(get_browser_versions))
       .routes(routes!(check_browser_downloaded))
-      .routes(routes!(get_wayfern_token, refresh_wayfern_token))
+      .routes(routes!(get_chromium_token, refresh_chromium_token))
       .split_for_parts();
 
     let api = ApiDoc::openapi();
@@ -382,7 +382,7 @@ async fn terms_check_middleware(
   next: Next,
 ) -> Result<Response, StatusCode> {
   // Check if Wayfern terms have been accepted
-  if !crate::wayfern_terms::WayfernTermsManager::instance().is_terms_accepted() {
+  if !crate::wayfern_terms::ChromiumTermsManager::instance().is_terms_accepted() {
     return Err(StatusCode::FORBIDDEN);
   }
 
@@ -591,7 +591,7 @@ async fn create_profile(
   };
 
   // Parse wayfern config if provided
-  let wayfern_config = if let Some(config) = &request.wayfern_config {
+  let chromium_config = if let Some(config) = &request.chromium_config {
     serde_json::from_value(config.clone()).ok()
   } else {
     None
@@ -608,7 +608,7 @@ async fn create_profile(
       request.proxy_id.clone(),
       None, // vpn_id
       camoufox_config,
-      wayfern_config,
+      chromium_config,
       request.group_id.clone(),
       false,
     )
@@ -1544,7 +1544,7 @@ async fn check_browser_downloaded(
 // API Handlers - Wayfern Token
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct WayfernTokenResponse {
+pub struct ChromiumTokenResponse {
   pub token: Option<String>,
 }
 
@@ -1552,7 +1552,7 @@ pub struct WayfernTokenResponse {
   get,
   path = "/v1/wayfern-token",
   responses(
-    (status = 200, description = "Current wayfern token", body = WayfernTokenResponse),
+    (status = 200, description = "Current wayfern token", body = ChromiumTokenResponse),
     (status = 401, description = "Unauthorized"),
   ),
   security(
@@ -1560,18 +1560,18 @@ pub struct WayfernTokenResponse {
   ),
   tag = "wayfern"
 )]
-async fn get_wayfern_token(
+async fn get_chromium_token(
   State(_state): State<ApiServerState>,
-) -> Result<Json<WayfernTokenResponse>, StatusCode> {
-  let token = crate::cloud_auth::CLOUD_AUTH.get_wayfern_token().await;
-  Ok(Json(WayfernTokenResponse { token }))
+) -> Result<Json<ChromiumTokenResponse>, StatusCode> {
+  let token = crate::cloud_auth::CLOUD_AUTH.get_chromium_token().await;
+  Ok(Json(ChromiumTokenResponse { token }))
 }
 
 #[utoipa::path(
   post,
   path = "/v1/wayfern-token/refresh",
   responses(
-    (status = 200, description = "Refreshed wayfern token", body = WayfernTokenResponse),
+    (status = 200, description = "Refreshed wayfern token", body = ChromiumTokenResponse),
     (status = 401, description = "Unauthorized"),
     (status = 500, description = "Failed to refresh token"),
   ),
@@ -1580,14 +1580,14 @@ async fn get_wayfern_token(
   ),
   tag = "wayfern"
 )]
-async fn refresh_wayfern_token(
+async fn refresh_chromium_token(
   State(_state): State<ApiServerState>,
-) -> Result<Json<WayfernTokenResponse>, (StatusCode, String)> {
+) -> Result<Json<ChromiumTokenResponse>, (StatusCode, String)> {
   crate::cloud_auth::CLOUD_AUTH
-    .request_wayfern_token()
+    .request_chromium_token()
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
-  let token = crate::cloud_auth::CLOUD_AUTH.get_wayfern_token().await;
-  Ok(Json(WayfernTokenResponse { token }))
+  let token = crate::cloud_auth::CLOUD_AUTH.get_chromium_token().await;
+  Ok(Json(ChromiumTokenResponse { token }))
 }

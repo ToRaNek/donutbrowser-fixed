@@ -26,6 +26,7 @@ impl CommercialLicenseManager {
     &COMMERCIAL_LICENSE_MANAGER
   }
 
+  #[allow(dead_code)]
   fn get_current_timestamp() -> u64 {
     SystemTime::now()
       .duration_since(UNIX_EPOCH)
@@ -43,6 +44,7 @@ impl CommercialLicenseManager {
     })
   }
 
+  #[allow(dead_code)]
   async fn get_or_set_first_launch(&self, _app_handle: &AppHandle) -> Result<u64, String> {
     let settings_manager = SettingsManager::instance();
     let mut settings = settings_manager

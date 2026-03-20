@@ -190,9 +190,9 @@
       "stopFollower": "Siguiendo las acciones de {{leaderName}}",
       "desyncedTooltip": "La sincronización falló en {{url}}",
       "paidFeature": "El sincronizador es una función de pago",
-      "wayfernOnly": "Solo los perfiles Wayfern pueden sincronizarse",
+      "chromiumOnly": "Solo los perfiles Chromium pueden sincronizarse",
       "selectFollowers": "Seleccionar perfiles seguidores",
-      "selectFollowersDesc": "Elige los perfiles que replicarán las acciones del perfil líder. Solo se pueden seleccionar perfiles Wayfern detenidos.",
+      "selectFollowersDesc": "Elige los perfiles que replicarán las acciones del perfil líder. Solo se pueden seleccionar perfiles Chromium detenidos.",
       "leader": "Líder",
       "follower": "Seguidor",
       "startSession": "Iniciar sesión de sincronización",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Navegador Anti-Detección",
       "description": "Elige un navegador con capacidades anti-detección",
-      "chromium": "Wayfern",
+      "chromium": "Chromium",
       "firefox": "Camoufox",
       "badge": "Navegador Anti-Detección"
     },
@@ -239,7 +239,7 @@
       "latestDownloading": "Descargando versión ({{version}})..."
     },
     "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Impulsado por Wayfern",
+    "chromiumSubtitle": "Impulsado por Fingerprint Chromium",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Impulsado por Camoufox",
     "camoufoxWarning": "Firefox (Camoufox) está mantenido por una organización de terceros. Para uso en producción, utilice Chromium."
@@ -468,8 +468,8 @@
         "webgl": "Bloquear WebGL"
       }
     },
-    "wayfern": {
-      "title": "Configuración de Wayfern",
+    "chromium": {
+      "title": "Configuración de Chromium",
       "fingerprint": {
         "title": "Huella Digital",
         "randomize": "Aleatorizar al Iniciar",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "wayfern": "Wayfern"
+    "chromium": "Chromium"
   },
   "fingerprint": {
     "crossOsWarning": "La suplantación de huella digital para un sistema operativo diferente es menos fiable porque es imposible imitar perfectamente todos los componentes subyacentes. Usar con precaución.",

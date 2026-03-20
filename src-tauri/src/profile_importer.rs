@@ -9,7 +9,7 @@ use crate::downloaded_browsers_registry::DownloadedBrowsersRegistry;
 use crate::profile::types::{get_host_os, BrowserProfile, SyncMode};
 use crate::profile::ProfileManager;
 use crate::proxy_manager::PROXY_MANAGER;
-use crate::wayfern_manager::WayfernConfig;
+use crate::wayfern_manager::ChromiumConfig;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DetectedProfile {
@@ -35,7 +35,7 @@ pub struct ProfileImporter {
   downloaded_browsers_registry: &'static DownloadedBrowsersRegistry,
   profile_manager: &'static ProfileManager,
   camoufox_manager: &'static crate::camoufox_manager::CamoufoxManager,
-  wayfern_manager: &'static crate::wayfern_manager::WayfernManager,
+  chromium_manager: &'static crate::wayfern_manager::ChromiumManager,
 }
 
 impl ProfileImporter {
@@ -45,7 +45,7 @@ impl ProfileImporter {
       downloaded_browsers_registry: DownloadedBrowsersRegistry::instance(),
       profile_manager: ProfileManager::instance(),
       camoufox_manager: crate::camoufox_manager::CamoufoxManager::instance(),
-      wayfern_manager: crate::wayfern_manager::WayfernManager::instance(),
+      chromium_manager: crate::wayfern_manager::ChromiumManager::instance(),
     }
   }
 
@@ -494,7 +494,7 @@ impl ProfileImporter {
     new_profile_name: &str,
     proxy_id: Option<String>,
     camoufox_config: Option<CamoufoxConfig>,
-    wayfern_config: Option<WayfernConfig>,
+    chromium_config: Option<ChromiumConfig>,
   ) -> Result<(), Box<dyn std::error::Error>> {
     let source_path = Path::new(source_path);
     if !source_path.exists() {
@@ -590,7 +590,7 @@ impl ProfileImporter {
           last_launch: None,
           release_type: "stable".to_string(),
           camoufox_config: None,
-          wayfern_config: None,
+          chromium_config: None,
           group_id: None,
           tags: Vec::new(),
           note: None,
@@ -628,8 +628,8 @@ impl ProfileImporter {
       None
     };
 
-    let final_wayfern_config = if mapped == "wayfern" {
-      let mut config = wayfern_config.unwrap_or_default();
+    let final_chromium_config = if mapped == "wayfern" {
+      let mut config = chromium_config.unwrap_or_default();
 
       if config.executable_path.is_none() {
         let mut browser_dir = self.profile_manager.get_binaries_dir();
@@ -689,7 +689,7 @@ impl ProfileImporter {
           last_launch: None,
           release_type: "stable".to_string(),
           camoufox_config: None,
-          wayfern_config: None,
+          chromium_config: None,
           group_id: None,
           tags: Vec::new(),
           note: None,
@@ -705,7 +705,7 @@ impl ProfileImporter {
         };
 
         match self
-          .wayfern_manager
+          .chromium_manager
           .generate_fingerprint_config(app_handle, &temp_profile, &config)
           .await
         {
@@ -738,7 +738,7 @@ impl ProfileImporter {
       last_launch: None,
       release_type: "stable".to_string(),
       camoufox_config: final_camoufox_config,
-      wayfern_config: final_wayfern_config,
+      chromium_config: final_chromium_config,
       group_id: None,
       tags: Vec::new(),
       note: None,
@@ -826,12 +826,12 @@ pub async fn import_browser_profile(
   new_profile_name: String,
   proxy_id: Option<String>,
   camoufox_config: Option<CamoufoxConfig>,
-  wayfern_config: Option<WayfernConfig>,
+  chromium_config: Option<ChromiumConfig>,
 ) -> Result<(), String> {
   let fingerprint_os = camoufox_config
     .as_ref()
     .and_then(|c| c.os.as_deref())
-    .or_else(|| wayfern_config.as_ref().and_then(|c| c.os.as_deref()));
+    .or_else(|| chromium_config.as_ref().and_then(|c| c.os.as_deref()));
 
   if !crate::cloud_auth::CLOUD_AUTH
     .is_fingerprint_os_allowed(fingerprint_os)
@@ -849,7 +849,7 @@ pub async fn import_browser_profile(
       &new_profile_name,
       proxy_id,
       camoufox_config,
-      wayfern_config,
+      chromium_config,
     )
     .await
     .map_err(|e| format!("Failed to import profile: {e}"))

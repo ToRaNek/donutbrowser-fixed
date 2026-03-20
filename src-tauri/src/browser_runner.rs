@@ -6,7 +6,7 @@ use crate::events;
 use crate::platform_browser;
 use crate::profile::{BrowserProfile, ProfileManager};
 use crate::proxy_manager::PROXY_MANAGER;
-use crate::wayfern_manager::{WayfernConfig, WayfernManager};
+use crate::wayfern_manager::{ChromiumConfig, ChromiumManager};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,7 +16,7 @@ pub struct BrowserRunner {
   pub downloaded_browsers_registry: &'static DownloadedBrowsersRegistry,
   auto_updater: &'static crate::auto_updater::AutoUpdater,
   camoufox_manager: &'static CamoufoxManager,
-  wayfern_manager: &'static WayfernManager,
+  chromium_manager: &'static ChromiumManager,
 }
 
 impl BrowserRunner {
@@ -26,7 +26,7 @@ impl BrowserRunner {
       downloaded_browsers_registry: DownloadedBrowsersRegistry::instance(),
       auto_updater: crate::auto_updater::AutoUpdater::instance(),
       camoufox_manager: CamoufoxManager::instance(),
-      wayfern_manager: WayfernManager::instance(),
+      chromium_manager: ChromiumManager::instance(),
     }
   }
 
@@ -374,15 +374,15 @@ impl BrowserRunner {
       return Ok(updated_profile);
     }
 
-    // Handle Wayfern profiles using WayfernManager
-    if profile.browser == "wayfern" {
+    // Handle Wayfern profiles using ChromiumManager
+    if profile.browser == "wayfern" || profile.browser == "chromium" {
       // Get or create wayfern config
-      let mut wayfern_config = profile.wayfern_config.clone().unwrap_or_else(|| {
+      let mut chromium_config = profile.chromium_config.clone().unwrap_or_else(|| {
         log::info!(
           "No wayfern config found for profile {}, using default",
           profile.name
         );
-        WayfernConfig::default()
+        ChromiumConfig::default()
       });
 
       // Always start a local proxy for Wayfern (for traffic monitoring and geoip support)
@@ -446,28 +446,28 @@ impl BrowserRunner {
       let proxy_url = format!("http://{}:{}", local_proxy.host, local_proxy.port);
 
       // Set proxy in wayfern config
-      wayfern_config.proxy = Some(proxy_url);
+      chromium_config.proxy = Some(proxy_url);
 
       log::info!(
         "Configured local proxy for Wayfern: {:?}",
-        wayfern_config.proxy
+        chromium_config.proxy
       );
 
       // Check if we need to generate a new fingerprint on every launch
       let mut updated_profile = profile.clone();
-      if wayfern_config.randomize_fingerprint_on_launch == Some(true) {
+      if chromium_config.randomize_fingerprint_on_launch == Some(true) {
         log::info!(
           "Generating random fingerprint for Wayfern profile: {}",
           profile.name
         );
 
         // Create a config copy without the existing fingerprint to force generation of a new one
-        let mut config_for_generation = wayfern_config.clone();
+        let mut config_for_generation = chromium_config.clone();
         config_for_generation.fingerprint = None;
 
         // Generate a new fingerprint
         let new_fingerprint = self
-          .wayfern_manager
+          .chromium_manager
           .generate_fingerprint_config(&app_handle, profile, &config_for_generation)
           .await
           .map_err(|e| format!("Failed to generate random fingerprint: {e}"))?;
@@ -478,21 +478,22 @@ impl BrowserRunner {
         );
 
         // Update the config with the new fingerprint for launching
-        wayfern_config.fingerprint = Some(new_fingerprint.clone());
+        chromium_config.fingerprint = Some(new_fingerprint.clone());
 
         // Save the updated fingerprint to the profile so it persists
-        let mut updated_wayfern_config = updated_profile.wayfern_config.clone().unwrap_or_default();
-        updated_wayfern_config.fingerprint = Some(new_fingerprint);
-        updated_wayfern_config.randomize_fingerprint_on_launch = Some(true);
-        if wayfern_config.os.is_some() {
-          updated_wayfern_config.os = wayfern_config.os.clone();
+        let mut updated_chromium_config =
+          updated_profile.chromium_config.clone().unwrap_or_default();
+        updated_chromium_config.fingerprint = Some(new_fingerprint);
+        updated_chromium_config.randomize_fingerprint_on_launch = Some(true);
+        if chromium_config.os.is_some() {
+          updated_chromium_config.os = chromium_config.os.clone();
         }
-        updated_profile.wayfern_config = Some(updated_wayfern_config.clone());
+        updated_profile.chromium_config = Some(updated_chromium_config.clone());
 
         log::info!(
-          "Updated profile wayfern_config with new fingerprint for profile: {}, fingerprint length: {}",
+          "Updated profile chromium_config with new fingerprint for profile: {}, fingerprint length: {}",
           profile.name,
-          updated_wayfern_config.fingerprint.as_ref().map(|f| f.len()).unwrap_or(0)
+          updated_chromium_config.fingerprint.as_ref().map(|f| f.len()).unwrap_or(0)
         );
       }
 
@@ -533,15 +534,15 @@ impl BrowserRunner {
       }
 
       // Get proxy URL from config
-      let proxy_url = wayfern_config.proxy.as_deref();
+      let proxy_url = chromium_config.proxy.as_deref();
 
-      let wayfern_result = self
-        .wayfern_manager
-        .launch_wayfern(
+      let chromium_result = self
+        .chromium_manager
+        .launch_chromium(
           &app_handle,
           &updated_profile,
           &profile_path_str,
-          &wayfern_config,
+          &chromium_config,
           url.as_deref(),
           proxy_url,
           profile.ephemeral,
@@ -554,7 +555,7 @@ impl BrowserRunner {
         })?;
 
       // Get the process ID from launch result
-      let process_id = wayfern_result.processId.unwrap_or(0);
+      let process_id = chromium_result.processId.unwrap_or(0);
       log::info!("Wayfern launched successfully with PID: {process_id}");
 
       // Update profile with the process info
@@ -570,10 +571,10 @@ impl BrowserRunner {
 
       // Save the updated profile
       log::info!(
-        "Saving profile {} with wayfern_config fingerprint length: {}",
+        "Saving profile {} with chromium_config fingerprint length: {}",
         updated_profile.name,
         updated_profile
-          .wayfern_config
+          .chromium_config
           .as_ref()
           .and_then(|c| c.fingerprint.as_ref())
           .map(|f| f.len())
@@ -694,8 +695,8 @@ impl BrowserRunner {
       }
     }
 
-    // Handle Wayfern profiles using WayfernManager
-    if profile.browser == "wayfern" {
+    // Handle Wayfern profiles using ChromiumManager
+    if profile.browser == "wayfern" || profile.browser == "chromium" {
       let profiles_dir = self.profile_manager.get_profiles_dir();
       let profile_data_path =
         crate::ephemeral_dirs::get_effective_profile_path(profile, &profiles_dir);
@@ -703,11 +704,11 @@ impl BrowserRunner {
 
       // Check if the process is running
       match self
-        .wayfern_manager
-        .find_wayfern_by_profile(&profile_path_str)
+        .chromium_manager
+        .find_chromium_by_profile(&profile_path_str)
         .await
       {
-        Some(_wayfern_process) => {
+        Some(_chromium_process) => {
           log::info!(
             "Opening URL in existing Wayfern process for profile: {} (ID: {})",
             profile.name,
@@ -716,7 +717,7 @@ impl BrowserRunner {
 
           // Use CDP to open URL in a new tab
           self
-            .wayfern_manager
+            .chromium_manager
             .open_url_in_tab(&profile_path_str, url)
             .await?;
           return Ok(());
@@ -1408,8 +1409,8 @@ impl BrowserRunner {
       return Ok(());
     }
 
-    // Handle Wayfern profiles using WayfernManager
-    if profile.browser == "wayfern" {
+    // Handle Wayfern profiles using ChromiumManager
+    if profile.browser == "wayfern" || profile.browser == "chromium" {
       let profiles_dir = self.profile_manager.get_profiles_dir();
       let profile_data_path =
         crate::ephemeral_dirs::get_effective_profile_path(profile, &profiles_dir);
@@ -1435,20 +1436,24 @@ impl BrowserRunner {
 
       let mut process_actually_stopped = false;
       match self
-        .wayfern_manager
-        .find_wayfern_by_profile(&profile_path_str)
+        .chromium_manager
+        .find_chromium_by_profile(&profile_path_str)
         .await
       {
-        Some(wayfern_process) => {
+        Some(chromium_process) => {
           log::info!(
             "Found Wayfern process: {} (PID: {:?})",
-            wayfern_process.id,
-            wayfern_process.processId
+            chromium_process.id,
+            chromium_process.processId
           );
 
-          match self.wayfern_manager.stop_wayfern(&wayfern_process.id).await {
+          match self
+            .chromium_manager
+            .stop_chromium(&chromium_process.id)
+            .await
+          {
             Ok(_) => {
-              if let Some(pid) = wayfern_process.processId {
+              if let Some(pid) = chromium_process.processId {
                 // Verify the process actually died by checking after a short delay
                 use tokio::time::{sleep, Duration};
                 sleep(Duration::from_millis(500)).await;
@@ -1460,13 +1465,13 @@ impl BrowserRunner {
                 if process_actually_stopped {
                   log::info!(
                     "Successfully stopped Wayfern process: {} (PID: {:?}) - verified process is dead",
-                    wayfern_process.id,
+                    chromium_process.id,
                     pid
                   );
                 } else {
                   log::warn!(
                     "Wayfern stop command returned success but process {} (PID: {:?}) is still running - forcing kill",
-                    wayfern_process.id,
+                    chromium_process.id,
                     pid
                   );
                   // Force kill the process
@@ -1487,7 +1492,7 @@ impl BrowserRunner {
                       if process_actually_stopped {
                         log::info!(
                           "Successfully force killed Wayfern process {} (PID: {:?})",
-                          wayfern_process.id,
+                          chromium_process.id,
                           pid
                         );
                       }
@@ -1510,7 +1515,7 @@ impl BrowserRunner {
                       if process_actually_stopped {
                         log::info!(
                           "Successfully force killed Wayfern process {} (PID: {:?})",
-                          wayfern_process.id,
+                          chromium_process.id,
                           pid
                         );
                       }
@@ -1529,7 +1534,7 @@ impl BrowserRunner {
                       if process_actually_stopped {
                         log::info!(
                           "Successfully force killed Wayfern process {} (PID: {:?})",
-                          wayfern_process.id,
+                          chromium_process.id,
                           pid
                         );
                       }
@@ -1543,13 +1548,13 @@ impl BrowserRunner {
             Err(e) => {
               log::error!(
                 "Error stopping Wayfern process {}: {}",
-                wayfern_process.id,
+                chromium_process.id,
                 e
               );
               // Try to force kill if we have a PID
-              if let Some(pid) = wayfern_process.processId {
+              if let Some(pid) = chromium_process.processId {
                 log::info!(
-                  "Attempting force kill after stop_wayfern error for PID: {}",
+                  "Attempting force kill after stop_chromium error for PID: {}",
                   pid
                 );
                 #[cfg(target_os = "macos")]
@@ -2223,7 +2228,8 @@ pub async fn launch_browser_profile(
 
   // Always start a local proxy before launching (non-Camoufox/Wayfern handled here; they have their own flow)
   // This ensures all traffic goes through the local proxy for monitoring and future features
-  if profile.browser != "camoufox" && profile.browser != "wayfern" {
+  if profile.browser != "camoufox" && profile.browser != "wayfern" && profile.browser != "chromium"
+  {
     // Determine upstream proxy if configured; otherwise use DIRECT (no upstream)
     // Refresh cloud proxy credentials and inject profile-specific sid
     let mut upstream_proxy = BrowserRunner::instance()

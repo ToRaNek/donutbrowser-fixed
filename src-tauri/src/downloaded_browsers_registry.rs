@@ -342,10 +342,21 @@ impl DownloadedBrowsersRegistry {
     &self,
     profiles: &[crate::profile::BrowserProfile],
   ) -> Vec<(String, String)> {
-    profiles
+    let mut versions: Vec<(String, String)> = profiles
       .iter()
       .map(|profile| (profile.browser.clone(), profile.version.clone()))
-      .collect()
+      .collect();
+    // Add aliases so "wayfern" and "chromium" are treated as the same browser
+    let aliases: Vec<(String, String)> = versions
+      .iter()
+      .filter_map(|(browser, version)| match browser.as_str() {
+        "wayfern" => Some(("chromium".to_string(), version.clone())),
+        "chromium" => Some(("wayfern".to_string(), version.clone())),
+        _ => None,
+      })
+      .collect();
+    versions.extend(aliases);
+    versions
   }
 
   /// Verify that all registered browsers actually exist on disk and clean up stale entries
@@ -394,11 +405,22 @@ impl DownloadedBrowsersRegistry {
     &self,
     profiles: &[crate::profile::BrowserProfile],
   ) -> Vec<(String, String)> {
-    profiles
+    let mut versions: Vec<(String, String)> = profiles
       .iter()
       .filter(|profile| profile.process_id.is_some())
       .map(|profile| (profile.browser.clone(), profile.version.clone()))
-      .collect()
+      .collect();
+    // Add aliases so "wayfern" and "chromium" are treated as the same browser
+    let aliases: Vec<(String, String)> = versions
+      .iter()
+      .filter_map(|(browser, version)| match browser.as_str() {
+        "wayfern" => Some(("chromium".to_string(), version.clone())),
+        "chromium" => Some(("wayfern".to_string(), version.clone())),
+        _ => None,
+      })
+      .collect();
+    versions.extend(aliases);
+    versions
   }
 
   /// Scan the binaries directory and sync with registry
@@ -1233,7 +1255,7 @@ pub async fn ensure_active_browsers_downloaded(
   let version_manager = crate::browser_version_manager::BrowserVersionManager::instance();
   let mut downloaded = Vec::new();
 
-  for browser in &["wayfern", "camoufox"] {
+  for browser in &["chromium", "wayfern", "camoufox"] {
     // Check if any version is already downloaded
     let existing = registry.get_downloaded_versions(browser);
     if !existing.is_empty() {

@@ -36,15 +36,17 @@ impl Extractor {
     // Determine browser type from the destination directory path
     let browser_type = if dest_dir.to_string_lossy().contains("camoufox") {
       "camoufox"
-    } else if dest_dir.to_string_lossy().contains("wayfern") {
-      "wayfern"
+    } else if dest_dir.to_string_lossy().contains("chromium")
+      || dest_dir.to_string_lossy().contains("wayfern")
+    {
+      "chromium"
     } else {
       return Ok(());
     };
 
-    // For Camoufox and Wayfern on Linux, we expect the executable directly under version directory
+    // For Camoufox and Chromium on Linux, we expect the executable directly under version directory
     // e.g., binaries/camoufox/<version>/camoufox, without an extra subdirectory
-    if browser_type == "camoufox" || browser_type == "wayfern" {
+    if browser_type == "camoufox" || browser_type == "chromium" {
       return Ok(());
     }
 

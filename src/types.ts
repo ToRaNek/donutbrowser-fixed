@@ -22,7 +22,7 @@ export interface BrowserProfile {
   last_launch?: number;
   release_type: string; // "stable" or "nightly"
   camoufox_config?: CamoufoxConfig; // Camoufox configuration
-  wayfern_config?: WayfernConfig; // Wayfern configuration
+  chromium_config?: ChromiumConfig; // Chromium configuration
   group_id?: string; // Reference to profile group
   tags?: string[];
   note?: string; // User note
@@ -376,9 +376,9 @@ export interface CamoufoxLaunchResult {
   url?: string;
 }
 
-export type WayfernOS = "windows" | "macos" | "linux" | "android" | "ios";
+export type ChromiumOS = "windows" | "macos" | "linux" | "android" | "ios";
 
-export interface WayfernConfig {
+export interface ChromiumConfig {
   proxy?: string;
   screen_max_width?: number;
   screen_max_height?: number;
@@ -391,11 +391,11 @@ export interface WayfernConfig {
   executable_path?: string;
   fingerprint?: string; // JSON string of the complete fingerprint config
   randomize_fingerprint_on_launch?: boolean; // Generate new fingerprint on every launch
-  os?: WayfernOS; // Operating system for fingerprint generation
+  os?: ChromiumOS; // Operating system for fingerprint generation
 }
 
-// Wayfern fingerprint config - matches the C++ FingerprintData structure
-export interface WayfernFingerprintConfig {
+// Chromium fingerprint config - matches the C++ FingerprintData structure
+export interface ChromiumFingerprintConfig {
   // User agent and platform
   userAgent?: string;
   platform?: string;
@@ -504,7 +504,7 @@ export interface WayfernFingerprintConfig {
   performanceMemory?: number;
 }
 
-export interface WayfernLaunchResult {
+export interface ChromiumLaunchResult {
   id: string;
   processId?: number;
   profilePath?: string;

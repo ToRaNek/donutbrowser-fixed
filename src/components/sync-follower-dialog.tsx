@@ -23,18 +23,18 @@ import { isCrossOsProfile } from "@/lib/browser-utils";
 import { showErrorToast } from "@/lib/toast-utils";
 import type {
   BrowserProfile,
+  ChromiumFingerprintConfig,
   SyncSessionInfo,
-  WayfernFingerprintConfig,
 } from "@/types";
 import { RippleButton } from "./ui/ripple";
 
 function getScreenSize(
   profile: BrowserProfile,
 ): { w: number; h: number } | null {
-  const fp = profile.wayfern_config?.fingerprint;
+  const fp = profile.chromium_config?.fingerprint;
   if (!fp) return null;
   try {
-    const parsed: WayfernFingerprintConfig = JSON.parse(fp);
+    const parsed: ChromiumFingerprintConfig = JSON.parse(fp);
     const w = parsed.screenWidth ?? parsed.windowInnerWidth;
     const h = parsed.screenHeight ?? parsed.windowInnerHeight;
     if (w && h) return { w, h };
@@ -65,7 +65,7 @@ export function SyncFollowerDialog({
   const eligibleProfiles = allProfiles.filter(
     (p) =>
       p.id !== leaderProfile?.id &&
-      p.browser === "wayfern" &&
+      p.browser === "chromium" &&
       !runningProfiles.has(p.id) &&
       !isCrossOsProfile(p),
   );
@@ -141,7 +141,7 @@ export function SyncFollowerDialog({
                 <div className="space-y-1 p-2">
                   {eligibleProfiles.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-4 text-center">
-                      {t("profiles.synchronizer.wayfernOnly")}
+                      {t("profiles.synchronizer.chromiumOnly")}
                     </p>
                   ) : (
                     eligibleProfiles.map((profile) => {

@@ -190,9 +190,9 @@
       "stopFollower": "Following actions of {{leaderName}}",
       "desyncedTooltip": "Synchronization failed at {{url}}",
       "paidFeature": "Synchronizer is a paid feature",
-      "wayfernOnly": "Only Wayfern profiles can be synchronized",
+      "chromiumOnly": "Only Chromium profiles can be synchronized",
       "selectFollowers": "Select Follower Profiles",
-      "selectFollowersDesc": "Choose profiles that will mirror the actions of the leader profile. Only stopped Wayfern profiles can be selected.",
+      "selectFollowersDesc": "Choose profiles that will mirror the actions of the leader profile. Only stopped Chromium profiles can be selected.",
       "leader": "Leader",
       "follower": "Follower",
       "startSession": "Start Sync Session",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Anti-Detect Browser",
       "description": "Choose a browser with anti-detection capabilities",
-      "chromium": "Wayfern",
+      "chromium": "Chromium",
       "firefox": "Camoufox",
       "badge": "Anti-Detect Browser"
     },
@@ -239,7 +239,7 @@
       "latestDownloading": "Downloading version ({{version}})..."
     },
     "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Powered by Wayfern",
+    "chromiumSubtitle": "Powered by Fingerprint Chromium",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Powered by Camoufox",
     "camoufoxWarning": "Firefox (Camoufox) is maintained by a third-party organization. For production use, please use Chromium."
@@ -468,8 +468,8 @@
         "webgl": "Block WebGL"
       }
     },
-    "wayfern": {
-      "title": "Wayfern Configuration",
+    "chromium": {
+      "title": "Chromium Configuration",
       "fingerprint": {
         "title": "Fingerprint",
         "randomize": "Randomize on Launch",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "wayfern": "Wayfern"
+    "chromium": "Chromium"
   },
   "fingerprint": {
     "crossOsWarning": "Spoofing fingerprint for a different operating system is less reliable because it is impossible to perfectly mimic all underlying components. Use with caution.",

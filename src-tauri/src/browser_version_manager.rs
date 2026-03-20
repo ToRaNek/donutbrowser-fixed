@@ -232,7 +232,7 @@ impl BrowserVersionManager {
       "brave" => self.fetch_brave_versions(true).await?,
       "chromium" => self.fetch_chromium_versions(true).await?,
       "camoufox" => self.fetch_camoufox_versions(true).await?,
-      "wayfern" => self.fetch_wayfern_versions(true).await?,
+      "wayfern" => self.fetch_fingerprint_chromium_versions(true).await?,
       _ => return Err(format!("Unsupported browser: {browser}").into()),
     };
 
@@ -435,7 +435,9 @@ impl BrowserVersionManager {
           .collect()
       }
       "wayfern" => {
-        let releases = self.fetch_wayfern_releases_detailed(true).await?;
+        let releases = self
+          .fetch_fingerprint_chromium_releases_detailed(true)
+          .await?;
         merged_versions
           .into_iter()
           .map(|version| {
@@ -684,8 +686,14 @@ impl BrowserVersionManager {
         //               ungoogled-chromium_VERSION-1.1_windows_x64.zip (Windows)
         //               ungoogled-chromium_VERSION-1.1_macos.dmg (macOS)
         let (filename, is_archive) = match (&os[..], &arch[..]) {
-          ("linux", "x64") => (format!("ungoogled-chromium-{version}-linux-x64.tar.xz"), true),
-          ("windows", "x64") => (format!("ungoogled-chromium-{version}-windows-x64.zip"), true),
+          ("linux", "x64") => (
+            format!("ungoogled-chromium-{version}-linux-x64.tar.xz"),
+            true,
+          ),
+          ("windows", "x64") => (
+            format!("ungoogled-chromium-{version}-windows-x64.zip"),
+            true,
+          ),
           ("macos", "x64") | ("macos", "arm64") => {
             (format!("ungoogled-chromium-{version}-macos.dmg"), true)
           }
@@ -879,21 +887,23 @@ impl BrowserVersionManager {
       .await
   }
 
-  async fn fetch_wayfern_versions(
+  async fn fetch_fingerprint_chromium_versions(
     &self,
     no_caching: bool,
   ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
-    let releases = self.fetch_wayfern_releases_detailed(no_caching).await?;
+    let releases = self
+      .fetch_fingerprint_chromium_releases_detailed(no_caching)
+      .await?;
     Ok(releases.into_iter().map(|r| r.tag_name).collect())
   }
 
-  async fn fetch_wayfern_releases_detailed(
+  async fn fetch_fingerprint_chromium_releases_detailed(
     &self,
     no_caching: bool,
   ) -> Result<Vec<GithubRelease>, Box<dyn std::error::Error + Send + Sync>> {
     self
       .api_client
-      .fetch_wayfern_releases_with_caching(no_caching)
+      .fetch_fingerprint_chromium_releases_with_caching(no_caching)
       .await
   }
 }

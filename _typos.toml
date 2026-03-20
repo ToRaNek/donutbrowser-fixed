@@ -5,8 +5,11 @@ extend-exclude = [
     "src/i18n/locales/*.json",
     "src-tauri/build.rs",
     "src-tauri/tests/fixtures/test.ovpn",
+    "src-tauri/src/fingerprint_data/injection.rs",
+    "src-tauri/extensions/**/*.js",
 ]
 
 [default.extend-words]
 DBE = "DBE"
 nd = "nd"
+ot = "ot"

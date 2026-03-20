@@ -24,6 +24,7 @@ mod downloader;
 mod ephemeral_dirs;
 mod extension_manager;
 mod extraction;
+mod fingerprint_data;
 mod geoip_downloader;
 mod group_manager;
 mod human_typing;
@@ -64,9 +65,9 @@ use browser_runner::{
 
 use profile::manager::{
   check_browser_status, clone_profile, create_browser_profile_new, delete_profile,
-  list_browser_profiles, rename_profile, update_camoufox_config, update_profile_note,
-  update_profile_proxy, update_profile_proxy_bypass_rules, update_profile_tags, update_profile_vpn,
-  update_wayfern_config,
+  list_browser_profiles, rename_profile, update_camoufox_config, update_chromium_config,
+  update_profile_note, update_profile_proxy, update_profile_proxy_bypass_rules,
+  update_profile_tags, update_profile_vpn,
 };
 
 use browser_version_manager::{
@@ -436,18 +437,18 @@ async fn export_profile_cookies(profile_id: String, format: String) -> Result<St
 }
 
 #[tauri::command]
-fn check_wayfern_terms_accepted() -> bool {
-  wayfern_terms::WayfernTermsManager::instance().is_terms_accepted()
+fn check_chromium_terms_accepted() -> bool {
+  wayfern_terms::ChromiumTermsManager::instance().is_terms_accepted()
 }
 
 #[tauri::command]
-fn check_wayfern_downloaded() -> bool {
-  wayfern_terms::WayfernTermsManager::instance().is_wayfern_downloaded()
+fn check_chromium_downloaded() -> bool {
+  wayfern_terms::ChromiumTermsManager::instance().is_chromium_downloaded()
 }
 
 #[tauri::command]
-async fn accept_wayfern_terms() -> Result<(), String> {
-  wayfern_terms::WayfernTermsManager::instance()
+async fn accept_chromium_terms() -> Result<(), String> {
+  wayfern_terms::ChromiumTermsManager::instance()
     .accept_terms()
     .await
 }
@@ -877,7 +878,7 @@ async fn generate_sample_fingerprint(
     last_launch: None,
     release_type: "stable".to_string(),
     camoufox_config: None,
-    wayfern_config: None,
+    chromium_config: None,
     group_id: None,
     tags: Vec::new(),
     note: None,
@@ -900,10 +901,10 @@ async fn generate_sample_fingerprint(
       .generate_fingerprint_config(&app_handle, &temp_profile, &config)
       .await
       .map_err(|e| format!("Failed to generate fingerprint: {e}"))
-  } else if browser == "wayfern" {
-    let config: crate::wayfern_manager::WayfernConfig =
+  } else if browser == "wayfern" || browser == "chromium" {
+    let config: crate::wayfern_manager::ChromiumConfig =
       serde_json::from_str(&config_json).map_err(|e| format!("Failed to parse config: {e}"))?;
-    let manager = crate::wayfern_manager::WayfernManager::instance();
+    let manager = crate::wayfern_manager::ChromiumManager::instance();
     manager
       .generate_fingerprint_config(&app_handle, &temp_profile, &config)
       .await
@@ -1560,7 +1561,7 @@ pub fn run() {
 
           // Request wayfern token on startup for paid users
           if cloud_auth::CLOUD_AUTH.has_active_paid_subscription().await {
-            if let Err(e) = cloud_auth::CLOUD_AUTH.request_wayfern_token().await {
+            if let Err(e) = cloud_auth::CLOUD_AUTH.request_chromium_token().await {
               log::warn!("Failed to request wayfern token on startup: {e}");
             }
           }
@@ -1636,7 +1637,7 @@ pub fn run() {
       parse_txt_proxies,
       import_proxies_from_parsed,
       update_camoufox_config,
-      update_wayfern_config,
+      update_chromium_config,
       generate_sample_fingerprint,
       get_profile_groups,
       get_groups_with_profile_counts,
@@ -1687,9 +1688,9 @@ pub fn run() {
       copy_profile_cookies,
       import_cookies_from_file,
       export_profile_cookies,
-      check_wayfern_terms_accepted,
-      check_wayfern_downloaded,
-      accept_wayfern_terms,
+      check_chromium_terms_accepted,
+      check_chromium_downloaded,
+      accept_chromium_terms,
       get_commercial_trial_status,
       acknowledge_trial_expiration,
       has_acknowledged_trial_expiration,
@@ -1722,8 +1723,8 @@ pub fn run() {
       cloud_auth::cloud_get_isps,
       cloud_auth::create_cloud_location_proxy,
       cloud_auth::restart_sync_service,
-      cloud_auth::cloud_get_wayfern_token,
-      cloud_auth::cloud_refresh_wayfern_token,
+      cloud_auth::cloud_get_chromium_token,
+      cloud_auth::cloud_refresh_chromium_token,
       // Team lock commands
       team_lock::get_team_locks,
       team_lock::get_team_lock_status,
@@ -1776,8 +1777,9 @@ mod tests {
       "set_extension_group_sync_enabled",
       "get_team_lock_status",
       "generate_sample_fingerprint",
-      "cloud_get_wayfern_token",
-      "cloud_refresh_wayfern_token",
+      "cloud_get_chromium_token",
+      "cloud_refresh_chromium_token",
+      "check_for_app_updates",
     ];
 
     // Extract command names from the generate_handler! macro in this file

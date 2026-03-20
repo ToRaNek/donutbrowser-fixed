@@ -13,21 +13,21 @@ import {
 } from "@/components/ui/dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast-utils";
 
-interface WayfernTermsDialogProps {
+interface ChromiumTermsDialogProps {
   isOpen: boolean;
   onAccepted: () => void;
 }
 
-export function WayfernTermsDialog({
+export function ChromiumTermsDialog({
   isOpen,
   onAccepted,
-}: WayfernTermsDialogProps) {
+}: ChromiumTermsDialogProps) {
   const [isAccepting, setIsAccepting] = useState(false);
 
   const handleAccept = useCallback(async () => {
     setIsAccepting(true);
     try {
-      await invoke("accept_wayfern_terms");
+      await invoke("accept_chromium_terms");
       showSuccessToast("Terms accepted successfully");
       onAccepted();
     } catch (error) {
@@ -50,9 +50,9 @@ export function WayfernTermsDialog({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>Wayfern Terms and Conditions</DialogTitle>
+          <DialogTitle>Chromium Terms and Conditions</DialogTitle>
           <DialogDescription>
-            Before using Donut Browser, you must read and agree to Wayfern's
+            Before using Donut Browser, you must read and agree to Chromium's
             Terms and Conditions.
           </DialogDescription>
         </DialogHeader>
@@ -62,12 +62,12 @@ export function WayfernTermsDialog({
             Please review the Terms and Conditions at:
           </p>
           <a
-            href="https://wayfern.com/terms-and-conditions"
+            href="https://chromium.org/terms-and-conditions"
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary hover:underline text-sm font-medium block"
           >
-            https://wayfern.com/terms-and-conditions
+            https://chromium.org/terms-and-conditions
           </a>
           <p className="text-sm text-muted-foreground">
             By clicking "I Accept", you agree to be bound by these terms.

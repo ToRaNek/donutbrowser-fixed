@@ -32,7 +32,7 @@ interface SharedCamoufoxConfigFormProps {
   isCreating?: boolean; // Flag to indicate if this is for creating a new profile
   forceAdvanced?: boolean; // Force advanced mode (for editing)
   readOnly?: boolean; // Flag to indicate if the form should be read-only
-  browserType?: "camoufox" | "wayfern"; // Browser type to customize form options
+  browserType?: "camoufox" | "chromium"; // Browser type to customize form options
   crossOsUnlocked?: boolean; // Allow selecting non-current OS (paid feature)
   limitedMode?: boolean; // Blur and disable advanced fields while keeping basic options accessible
   profileVersion?: string;
@@ -979,7 +979,7 @@ export function SharedCamoufoxConfigForm({
             <Label>{t("fingerprint.fonts")}</Label>
             <MultipleSelector
               value={(() => {
-                // Handle fonts being either an array or a JSON string (Wayfern format)
+                // Handle fonts being either an array or a JSON string (Chromium format)
                 let fontsArray: string[] = [];
                 if (fingerprintConfig.fonts) {
                   if (Array.isArray(fingerprintConfig.fonts)) {

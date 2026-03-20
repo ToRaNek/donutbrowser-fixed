@@ -5,6 +5,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FaFolder } from "react-icons/fa";
 import { toast } from "sonner";
+import { ChromiumConfigForm } from "@/components/chromium-config-form";
 import { LoadingButton } from "@/components/loading-button";
 import { SharedCamoufoxConfigForm } from "@/components/shared-camoufox-config-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -25,17 +26,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { WayfernConfigForm } from "@/components/wayfern-config-form";
 import { useBrowserSupport } from "@/hooks/use-browser-support";
 import { useProxyEvents } from "@/hooks/use-proxy-events";
 import { getBrowserDisplayName, getBrowserIcon } from "@/lib/browser-utils";
-import type { CamoufoxConfig, DetectedProfile, WayfernConfig } from "@/types";
+import type { CamoufoxConfig, ChromiumConfig, DetectedProfile } from "@/types";
 import { RippleButton } from "./ui/ripple";
 
-const getMappedBrowser = (browser: string): "camoufox" | "wayfern" => {
+const getMappedBrowser = (browser: string): "camoufox" | "chromium" => {
   if (["firefox", "firefox-developer", "zen"].includes(browser))
     return "camoufox";
-  return "wayfern";
+  return "chromium";
 };
 
 interface ImportProfileDialogProps {
@@ -61,7 +61,7 @@ export function ImportProfileDialog({
     "select",
   );
   const [camoufoxConfig, setCamoufoxConfig] = useState<CamoufoxConfig>({});
-  const [wayfernConfig, setWayfernConfig] = useState<WayfernConfig>({});
+  const [chromiumConfig, setChromiumConfig] = useState<ChromiumConfig>({});
   const [selectedProxyId, setSelectedProxyId] = useState<string | undefined>();
 
   // Auto-detect state
@@ -166,7 +166,7 @@ export function ImportProfileDialog({
 
     const mappedBrowser =
       importMode === "auto-detect" && selectedProfile
-        ? (selectedProfile.mapped_browser as "camoufox" | "wayfern")
+        ? (selectedProfile.mapped_browser as "camoufox" | "chromium")
         : getMappedBrowser(browserType);
 
     setIsImporting(true);
@@ -177,7 +177,7 @@ export function ImportProfileDialog({
         newProfileName,
         proxyId: selectedProxyId ?? null,
         camoufoxConfig: mappedBrowser === "camoufox" ? camoufoxConfig : null,
-        wayfernConfig: mappedBrowser === "wayfern" ? wayfernConfig : null,
+        chromiumConfig: mappedBrowser === "chromium" ? chromiumConfig : null,
       });
 
       toast.success(`Successfully imported profile "${newProfileName}"`);
@@ -211,7 +211,7 @@ export function ImportProfileDialog({
     manualProfileName,
     selectedProxyId,
     camoufoxConfig,
-    wayfernConfig,
+    chromiumConfig,
     onClose,
     selectedProfile,
   ]);
@@ -219,7 +219,7 @@ export function ImportProfileDialog({
   const handleClose = () => {
     setCurrentStep("select");
     setCamoufoxConfig({});
-    setWayfernConfig({});
+    setChromiumConfig({});
     setSelectedProxyId(undefined);
     setSelectedDetectedProfile(null);
     setAutoDetectProfileName("");
@@ -249,10 +249,10 @@ export function ImportProfileDialog({
 
   const currentMappedBrowser = useMemo(() => {
     if (importMode === "auto-detect" && selectedProfile) {
-      return selectedProfile.mapped_browser as "camoufox" | "wayfern";
+      return selectedProfile.mapped_browser as "camoufox" | "chromium";
     }
     if (importMode === "manual" && manualBrowserType) {
-      return manualBrowserType as "camoufox" | "wayfern";
+      return manualBrowserType as "camoufox" | "chromium";
     }
     return null;
   }, [importMode, selectedProfile, manualBrowserType]);
@@ -562,10 +562,10 @@ export function ImportProfileDialog({
                   limitedMode={!crossOsUnlocked}
                 />
               ) : (
-                <WayfernConfigForm
-                  config={wayfernConfig}
+                <ChromiumConfigForm
+                  config={chromiumConfig}
                   onConfigChange={(key, value) => {
-                    setWayfernConfig((prev) => ({ ...prev, [key]: value }));
+                    setChromiumConfig((prev) => ({ ...prev, [key]: value }));
                   }}
                   isCreating={true}
                   crossOsUnlocked={crossOsUnlocked}
