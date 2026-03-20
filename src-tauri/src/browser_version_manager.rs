@@ -62,19 +62,7 @@ impl BrowserVersionManager {
         // Brave supports all platforms and architectures
         Ok(true)
       }
-      "chromium" => {
-        // Chromium doesn't support ARM64 on Linux
-        if arch == "arm64" && os == "linux" {
-          Ok(false)
-        } else {
-          Ok(true)
-        }
-      }
-      "camoufox" => {
-        // Camoufox supports all platforms and architectures according to the JS code
-        Ok(true)
-      }
-      "wayfern" => {
+      "chromium" | "wayfern" => {
         // fingerprint-chromium supports Linux x64, Windows x64, and macOS (universal)
         Ok(matches!(
           (&os[..], &arch[..]),
@@ -230,9 +218,8 @@ impl BrowserVersionManager {
       "firefox-developer" => self.fetch_firefox_developer_versions(true).await?,
       "zen" => self.fetch_zen_versions(true).await?,
       "brave" => self.fetch_brave_versions(true).await?,
-      "chromium" => self.fetch_chromium_versions(true).await?,
+      "chromium" | "wayfern" => self.fetch_fingerprint_chromium_versions(true).await?,
       "camoufox" => self.fetch_camoufox_versions(true).await?,
-      "wayfern" => self.fetch_fingerprint_chromium_versions(true).await?,
       _ => return Err(format!("Unsupported browser: {browser}").into()),
     };
 
@@ -392,27 +379,6 @@ impl BrowserVersionManager {
           })
           .collect()
       }
-      "chromium" => {
-        let releases = self.fetch_chromium_releases_detailed(true).await?;
-        merged_versions
-          .into_iter()
-          .map(|version| {
-            if let Some(release) = releases.iter().find(|r| r.version == version) {
-              BrowserVersionInfo {
-                version: release.version.clone(),
-                is_prerelease: release.is_prerelease,
-                date: release.date.clone(),
-              }
-            } else {
-              BrowserVersionInfo {
-                version: version.clone(),
-                is_prerelease: false, // Chromium usually stable releases
-                date: "".to_string(),
-              }
-            }
-          })
-          .collect()
-      }
       "camoufox" => {
         let releases = self.fetch_camoufox_releases_detailed(true).await?;
         merged_versions
@@ -434,7 +400,7 @@ impl BrowserVersionManager {
           })
           .collect()
       }
-      "wayfern" => {
+      "chromium" | "wayfern" => {
         let releases = self
           .fetch_fingerprint_chromium_releases_detailed(true)
           .await?;
@@ -625,30 +591,16 @@ impl BrowserVersionManager {
         })
       }
       "chromium" => {
-        let platform_str = match (&os[..], &arch[..]) {
-          ("windows", "x64") => "Win_x64",
-          ("windows", "arm64") => "Win_Arm64",
-          ("linux", "x64") => "Linux_x64",
-          ("linux", "arm64") => return Err("Chromium doesn't support ARM64 on Linux".into()),
-          ("macos", "x64") => "Mac",
-          ("macos", "arm64") => "Mac_Arm",
-          _ => {
-            return Err(
-              format!("Unsupported platform/architecture for Chromium: {os}/{arch}").into(),
-            )
-          }
+        // Redirect to fingerprint-chromium (same as wayfern)
+        let filename = match (&os[..], &arch[..]) {
+          ("linux", "x64") => format!("ungoogled-chromium-{version}-1-x86_64_linux.tar.xz"),
+          ("windows", "x64") => format!("ungoogled-chromium_{version}-1.1_windows_x64.zip"),
+          ("macos", _) => format!("ungoogled-chromium_{version}-1.1_macos.dmg"),
+          _ => return Err(format!("Unsupported platform for fingerprint-chromium: {os}/{arch}").into()),
         };
-
-        let (archive_name, filename) = match os.as_str() {
-          "windows" => ("chrome-win.zip", format!("chromium-{version}-win.zip")),
-          "linux" => ("chrome-linux.zip", format!("chromium-{version}-linux.zip")),
-          "macos" => ("chrome-mac.zip", format!("chromium-{version}-mac.zip")),
-          _ => return Err(format!("Unsupported platform for Chromium: {os}").into()),
-        };
-
         Ok(DownloadInfo {
           url: format!(
-            "https://commondatastorage.googleapis.com/chromium-browser-snapshots/{platform_str}/{version}/{archive_name}"
+            "https://github.com/adryfish/fingerprint-chromium/releases/download/{version}/{filename}"
           ),
           filename,
           is_archive: true,

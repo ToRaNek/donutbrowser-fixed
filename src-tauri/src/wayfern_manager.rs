@@ -109,6 +109,137 @@ impl ChromiumManager {
     crate::app_dirs::binaries_dir()
   }
 
+  /// On Linux, when the fingerprint targets a different OS (macOS/Windows),
+  /// generate a fontconfig configuration that includes font files matching
+  /// the target platform. This uses fonts bundled with Camoufox.
+  /// Returns the path to the fontconfig directory if successful.
+  #[cfg(target_os = "linux")]
+  fn setup_cross_os_fontconfig(target_os: &str) -> Option<String> {
+    let (font_subdir, fontconfig_subdir) = match target_os {
+      "macos" => ("macos", "fontconfig-macos"),
+      "windows" => ("windows", "fontconfig-windows"),
+      _ => return None,
+    };
+
+    let data_dir = crate::app_dirs::data_dir();
+    let fontconfig_dir = data_dir.join(fontconfig_subdir);
+
+    // Find Camoufox font directory: binaries/camoufox/<version>/fonts/<os>/
+    let camoufox_base = data_dir.join("binaries").join("camoufox");
+    let font_dirs = Self::find_camoufox_font_dirs(&camoufox_base, font_subdir);
+
+    if font_dirs.is_empty() {
+      log::warn!(
+        "No Camoufox {font_subdir} fonts found under {}, cross-OS fontconfig not available",
+        camoufox_base.display()
+      );
+      return None;
+    }
+
+    // Generate fontconfig
+    if let Err(e) = Self::write_fontconfig(&fontconfig_dir, target_os, &font_dirs) {
+      log::warn!("Failed to write fontconfig for {target_os}: {e}");
+      return None;
+    }
+
+    Some(fontconfig_dir.to_string_lossy().to_string())
+  }
+
+  /// Find Camoufox font directories for a given OS.
+  /// Looks in binaries/camoufox/<version>/fonts/<os>/ and its Supplemental subdirectory.
+  #[cfg(target_os = "linux")]
+  fn find_camoufox_font_dirs(camoufox_base: &std::path::Path, font_subdir: &str) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    let Ok(entries) = std::fs::read_dir(camoufox_base) else {
+      return dirs;
+    };
+
+    // Find the most recent version directory
+    let mut versions: Vec<PathBuf> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+    versions.sort();
+
+    for version_dir in versions.iter().rev() {
+      let fonts_dir = version_dir.join("fonts").join(font_subdir);
+      if fonts_dir.is_dir() {
+        dirs.push(fonts_dir.clone());
+        let supplemental = fonts_dir.join("Supplemental");
+        if supplemental.is_dir() {
+          dirs.push(supplemental);
+        }
+        break;
+      }
+    }
+
+    dirs
+  }
+
+  /// Write a fontconfig fonts.conf file for the given target OS.
+  #[cfg(target_os = "linux")]
+  fn write_fontconfig(
+    fontconfig_dir: &std::path::Path,
+    target_os: &str,
+    font_dirs: &[PathBuf],
+  ) -> Result<(), Box<dyn std::error::Error>> {
+    std::fs::create_dir_all(fontconfig_dir)?;
+
+    let font_dir_entries: String = font_dirs
+      .iter()
+      .map(|d| format!("\t<dir>{}</dir>", d.display()))
+      .collect::<Vec<_>>()
+      .join("\n");
+
+    let os_aliases = match target_os {
+      "macos" => include_str!("fontconfig_macos.xml"),
+      "windows" => include_str!("fontconfig_windows.xml"),
+      _ => "",
+    };
+
+    let content = format!(
+      r#"<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+
+<!-- Target platform ({target_os}) font directories -->
+{font_dir_entries}
+
+<!-- System font directories as fallback -->
+	<dir>/usr/share/fonts</dir>
+	<dir>/usr/local/share/fonts</dir>
+
+{os_aliases}
+
+<!-- Font cache directory list -->
+	<cachedir prefix="xdg">fontconfig</cachedir>
+
+	<config>
+		<rescan>
+			<int>30</int>
+		</rescan>
+	</config>
+
+	<!-- Standardize rendering settings -->
+	<match target="pattern">
+		<edit name="antialias" mode="assign"><bool>true</bool></edit>
+		<edit name="autohint" mode="assign"><bool>false</bool></edit>
+		<edit name="hinting" mode="assign"><bool>true</bool></edit>
+		<edit name="hintstyle" mode="assign"><const>hintfull</const></edit>
+		<edit name="lcdfilter" mode="assign"><const>lcddefault</const></edit>
+		<edit name="rgba" mode="assign"><const>none</const></edit>
+	</match>
+</fontconfig>
+"#
+    );
+
+    let conf_path = fontconfig_dir.join("fonts.conf");
+    std::fs::write(&conf_path, content)?;
+    log::info!(
+      "Wrote fontconfig for {target_os} at {}",
+      conf_path.display()
+    );
+    Ok(())
+  }
+
   async fn find_free_port() -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let port = listener.local_addr()?.port();
@@ -196,7 +327,7 @@ impl ChromiumManager {
     config: &WayfernConfig,
   ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     // fingerprint-chromium uses deterministic seeds: just generate a random one
-    let seed = config.seed.unwrap_or_else(|| rand::random::<u32>());
+    let seed = config.seed.unwrap_or_else(rand::random::<u32>);
     log::info!("Generated fingerprint-chromium seed: {seed}");
     Ok(seed.to_string())
   }
@@ -254,12 +385,16 @@ impl ChromiumManager {
       "--disable-features=DialMediaRouteProvider".to_string(),
       "--use-mock-keychain".to_string(),
       "--password-store=basic".to_string(),
-      // Ensure WebGL works via SwiftShader software rendering (needed on headless/GPU-less environments).
-      // fingerprint-chromium bundles SwiftShader; these flags activate it for the ANGLE backend
-      // so that WebGL data is populated and canvas noise goes through the correct rendering path.
+      // Use ANGLE with native GL backend (Mesa llvmpipe) instead of SwiftShader.
+      // This avoids the failIfMajorPerformanceCaveat detection that pixelscan uses
+      // to detect software rendering. Mesa's llvmpipe is treated as a real GL driver
+      // by ANGLE, so WebGL contexts with failIfMajorPerformanceCaveat:true succeed.
       "--use-gl=angle".to_string(),
-      "--use-angle=swiftshader-webgl".to_string(),
-      "--enable-unsafe-swiftshader".to_string(),
+      "--use-angle=gl".to_string(),
+      "--ignore-gpu-blocklist".to_string(),
+      // Disable fingerprint-chromium's seed-based canvas noise.
+      // Pixelscan detects injected noise via double-render comparison.
+      "--disable-spoofing=canvas".to_string(),
     ];
 
     // Build fingerprint CLI args for fingerprint-chromium
@@ -269,9 +404,13 @@ impl ChromiumManager {
       .as_deref()
       .and_then(|s| s.parse::<u32>().ok())
       .or(config.seed)
-      .unwrap_or_else(|| rand::random::<u32>());
+      .unwrap_or_else(rand::random::<u32>);
     args.push(format!("--fingerprint={seed}"));
-    log::info!("Using fingerprint seed: {seed}, config.os: {:?}, config.brand: {:?}", config.os, config.brand);
+    log::info!(
+      "Using fingerprint seed: {seed}, config.os: {:?}, config.brand: {:?}",
+      config.os,
+      config.brand
+    );
 
     if let Some(ref os) = config.os {
       args.push(format!("--fingerprint-platform={os}"));
@@ -350,6 +489,24 @@ impl ChromiumManager {
     cmd.args(&args);
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
+
+    // Set Mesa env vars to make ANGLE's native GL backend pass
+    // failIfMajorPerformanceCaveat checks even on software rendering
+    #[cfg(target_os = "linux")]
+    {
+      cmd.env("MESA_GL_VERSION_OVERRIDE", "4.5");
+      cmd.env("MESA_GLSL_VERSION_OVERRIDE", "450");
+    }
+
+    // On Linux, when fingerprinting a different OS, set up fontconfig to use
+    // fonts that match the target platform (bundled with Camoufox).
+    #[cfg(target_os = "linux")]
+    if let Some(ref os) = config.os {
+      if let Some(fontconfig_path) = Self::setup_cross_os_fontconfig(os) {
+        cmd.env("FONTCONFIG_PATH", &fontconfig_path);
+        log::info!("Set FONTCONFIG_PATH={fontconfig_path} for cross-OS font rendering");
+      }
+    }
 
     let child = cmd.spawn()?;
     let process_id = child.id();

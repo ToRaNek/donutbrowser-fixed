@@ -305,16 +305,12 @@ pub fn is_browser_version_nightly(
       // This will be handled in the API parsing, so this fallback is for cached versions
       is_nightly_version(version)
     }
-    "chromium" => {
-      // Chromium builds are generally stable snapshots
+    "chromium" | "wayfern" => {
+      // fingerprint-chromium releases are stable
       false
     }
     "camoufox" => {
       // For Camoufox, beta versions are actually the stable releases
-      false
-    }
-    "wayfern" => {
-      // For Wayfern, all releases from version.json are stable
       false
     }
     _ => {

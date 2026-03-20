@@ -1,0 +1,99 @@
+<!-- macOS generic family defaults -->
+	<match target="pattern">
+		<test qual="any" name="family"><string>mono</string></test>
+		<edit name="family" mode="assign" binding="same"><string>monospace</string></edit>
+	</match>
+	<match target="pattern">
+		<test qual="any" name="family"><string>sans serif</string></test>
+		<edit name="family" mode="assign" binding="same"><string>sans-serif</string></edit>
+	</match>
+	<match target="pattern">
+		<test qual="any" name="family"><string>sans</string></test>
+		<edit name="family" mode="assign" binding="same"><string>sans-serif</string></edit>
+	</match>
+	<match target="pattern">
+		<test qual="any" name="family"><string>sans-serif</string></test>
+		<edit name="family" mode="assign" binding="same"><string>Helvetica</string></edit>
+	</match>
+	<match target="pattern">
+		<test qual="any" name="family"><string>serif</string></test>
+		<edit name="family" mode="assign" binding="same"><string>Times</string></edit>
+	</match>
+	<match target="pattern">
+		<test qual="any" name="family"><string>monospace</string></test>
+		<edit name="family" mode="assign" binding="same"><string>Menlo</string></edit>
+	</match>
+	<match target="pattern">
+		<test qual="any" name="family"><string>cursive</string></test>
+		<edit name="family" mode="assign" binding="same"><string>Apple Chancery</string></edit>
+	</match>
+	<match target="pattern">
+		<test qual="any" name="family"><string>fantasy</string></test>
+		<edit name="family" mode="assign" binding="same"><string>Zapfino</string></edit>
+	</match>
+	<match target="pattern">
+		<test qual="any" name="family"><string>system-ui</string></test>
+		<edit name="family" mode="assign" binding="same"><string>Helvetica Neue</string></edit>
+	</match>
+
+<!-- Fallback aliases: map macOS font names to Linux alternatives -->
+	<alias>
+		<family>Helvetica Neue</family>
+		<accept><family>Liberation Sans</family></accept>
+	</alias>
+	<alias>
+		<family>Helvetica</family>
+		<accept><family>Liberation Sans</family></accept>
+	</alias>
+	<alias>
+		<family>Lucida Grande</family>
+		<accept><family>Liberation Sans</family></accept>
+	</alias>
+	<alias>
+		<family>Monaco</family>
+		<accept><family>Liberation Mono</family></accept>
+	</alias>
+	<alias>
+		<family>Menlo</family>
+		<accept><family>Liberation Mono</family></accept>
+	</alias>
+	<alias>
+		<family>Times</family>
+		<accept><family>Liberation Serif</family></accept>
+	</alias>
+	<alias>
+		<family>Courier</family>
+		<accept><family>Liberation Mono</family></accept>
+	</alias>
+	<alias>
+		<family>Courier New</family>
+		<accept><family>Liberation Mono</family></accept>
+	</alias>
+	<alias>
+		<family>Geneva</family>
+		<accept><family>Liberation Sans</family></accept>
+	</alias>
+	<alias>
+		<family>Optima</family>
+		<accept><family>Liberation Sans</family></accept>
+	</alias>
+	<alias>
+		<family>Palatino</family>
+		<accept><family>Liberation Serif</family></accept>
+	</alias>
+	<alias>
+		<family>Gill Sans</family>
+		<accept><family>Liberation Sans</family></accept>
+	</alias>
+	<alias>
+		<family>Futura</family>
+		<accept><family>Liberation Sans</family></accept>
+	</alias>
+	<alias>
+		<family>Apple Chancery</family>
+		<accept><family>Liberation Serif</family></accept>
+	</alias>
+	<alias>
+		<family>Zapfino</family>
+		<accept><family>Liberation Serif</family></accept>
+	</alias>

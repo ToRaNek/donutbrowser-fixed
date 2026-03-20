@@ -746,8 +746,8 @@ impl Browser for ChromiumBrowser {
 
     #[cfg(target_os = "linux")]
     {
-      return linux::is_chromium_version_downloaded(&install_dir, &BrowserType::Chromium)
-        || linux::is_chromium_version_downloaded(&legacy_install_dir, &BrowserType::Chromium);
+      linux::is_chromium_version_downloaded(&install_dir, &BrowserType::Chromium)
+        || linux::is_chromium_version_downloaded(&legacy_install_dir, &BrowserType::Chromium)
     }
 
     #[cfg(target_os = "windows")]

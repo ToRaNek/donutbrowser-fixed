@@ -60,9 +60,14 @@ pub fn determine_ua_os(user_agent: &str) -> &'static str {
 }
 
 /// Get the fontconfig path environment variable for Linux.
+/// `camoufox_path` is the path to the Camoufox executable file.
+/// The fontconfig directories live alongside the executable at
+/// `<parent>/fontconfigs/<target_os>/`.
 pub fn get_fontconfig_env(target_os: &str, camoufox_path: &std::path::Path) -> Option<String> {
   if cfg!(target_os = "linux") {
-    let fontconfig_dir = camoufox_path.join("fontconfig").join(target_os);
+    // Get the directory containing the executable
+    let base_dir = camoufox_path.parent()?;
+    let fontconfig_dir = base_dir.join("fontconfigs").join(target_os);
     if fontconfig_dir.exists() {
       return Some(fontconfig_dir.to_string_lossy().to_string());
     }
