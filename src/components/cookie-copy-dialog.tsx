@@ -370,7 +370,7 @@ export function CookieCopyDialog({
               {targetProfiles.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {sourceProfileId
-                    ? "No other Chromium/Camoufox profiles selected"
+                    ? "No other Camoufox profiles selected"
                     : "Select a source profile first"}
                 </p>
               ) : (

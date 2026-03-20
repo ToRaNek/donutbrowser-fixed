@@ -190,9 +190,9 @@
       "stopFollower": "Повторяет действия {{leaderName}}",
       "desyncedTooltip": "Синхронизация не удалась на {{url}}",
       "paidFeature": "Синхронизатор — платная функция",
-      "chromiumOnly": "Синхронизировать можно только профили Chromium",
+      "chromiumOnly": "Нет доступных профилей для синхронизации",
       "selectFollowers": "Выберите профили-последователи",
-      "selectFollowersDesc": "Выберите профили, которые будут повторять действия профиля-лидера. Можно выбрать только остановленные профили Chromium.",
+      "selectFollowersDesc": "Выберите профили, которые будут повторять действия профиля-лидера. Можно выбрать только остановленные профили.",
       "leader": "Лидер",
       "follower": "Последователь",
       "startSession": "Начать сессию синхронизации",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Антидетект браузер",
       "description": "Выберите браузер с возможностями защиты от обнаружения",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Camoufox",
       "badge": "Антидетект браузер"
     },
@@ -238,11 +238,11 @@
       "latestAvailable": "Последняя версия ({{version}}) доступна",
       "latestDownloading": "Загрузка версии ({{version}})..."
     },
-    "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "На базе Fingerprint Chromium",
+    "chromiumLabel": "Camoufox",
+    "chromiumSubtitle": "Антидетект браузер",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "На базе Camoufox",
-    "camoufoxWarning": "Firefox (Camoufox) поддерживается сторонней организацией. Для промышленного использования используйте Chromium."
+    "camoufoxWarning": "Firefox (Camoufox) поддерживается сторонней организацией."
   },
   "deleteDialog": {
     "title": "Удалить профиль",
@@ -469,7 +469,7 @@
       }
     },
     "chromium": {
-      "title": "Настройки Chromium",
+      "title": "Настройки браузера",
       "fingerprint": {
         "title": "Отпечаток",
         "randomize": "Случайный при запуске",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "chromium": "Chromium"
+    "chromium": "Camoufox"
   },
   "fingerprint": {
     "crossOsWarning": "Подмена отпечатка для другой операционной системы менее надёжна, так как невозможно идеально имитировать все базовые компоненты. Используйте с осторожностью.",
@@ -799,9 +799,9 @@
     "extensionGroup": "Группа расширений",
     "compatibility": {
       "label": "Совместимость",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Firefox",
-      "both": "Chromium и Firefox"
+      "both": "Camoufox и Firefox"
     },
     "selectedFile": "Выбранный файл",
     "namePlaceholder": "Название расширения",

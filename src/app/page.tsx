@@ -32,6 +32,7 @@ import { SyncConfigDialog } from "@/components/sync-config-dialog";
 import { SyncFollowerDialog } from "@/components/sync-follower-dialog";
 import { WindowResizeWarningDialog } from "@/components/window-resize-warning-dialog";
 import { useAppUpdateNotifications } from "@/hooks/use-app-update-notifications";
+// chromium terms hook kept for backward compat but always returns accepted
 import { useChromiumTerms } from "@/hooks/use-chromium-terms";
 import { useCloudAuth } from "@/hooks/use-cloud-auth";
 import { useCommercialTrial } from "@/hooks/use-commercial-trial";
@@ -96,8 +97,8 @@ export default function Home() {
   const [syncLeaderProfile, setSyncLeaderProfile] =
     useState<BrowserProfile | null>(null);
 
-  // Chromium terms hook (used by download listener)
-  const { checkTerms } = useChromiumTerms();
+  // Chromium terms - no longer needed, kept for backward compat
+  useChromiumTerms();
   const {
     trialStatus,
     hasAcknowledged: trialAcknowledged,
@@ -738,7 +739,7 @@ export default function Home() {
     );
     if (eligibleProfiles.length === 0) {
       showErrorToast(
-        "Cookie copy only works with Chromium and Camoufox profiles",
+        "Cookie copy only works with Camoufox profiles",
       );
       return;
     }
@@ -910,7 +911,7 @@ export default function Home() {
       void checkMissingBinaries();
     }
 
-    // Proactively download Chromium and Camoufox if not already available
+    // Proactively download Camoufox if not already available
     if (!profilesLoading) {
       void invoke("ensure_active_browsers_downloaded").catch((err: unknown) => {
         console.error("Failed to auto-download browsers:", err);
@@ -933,7 +934,7 @@ export default function Home() {
     profiles.length,
   ]);
 
-  // Show warning for non-chromium/camoufox profiles (support ending March 15, 2026)
+  // Show warning for non-camoufox/chromium profiles (support ending March 15, 2026)
   useEffect(() => {
     if (profiles.length === 0) return;
 
@@ -950,7 +951,7 @@ export default function Home() {
         id: "browser-support-ending-warning",
         type: "error",
         title: "Browser support ending soon",
-        description: `Support for the following profiles will be removed on March 15, 2026: ${unsupportedNames}. Please migrate to Chromium or Camoufox profiles.`,
+        description: `Support for the following profiles will be removed on March 15, 2026: ${unsupportedNames}. Please migrate to Camoufox profiles.`,
         duration: 15000,
         action: {
           label: "Learn more",
@@ -965,24 +966,7 @@ export default function Home() {
     }
   }, [profiles]);
 
-  // Re-check Chromium terms when a browser download completes
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    const setup = async () => {
-      unlisten = await listen<{ stage: string }>(
-        "download-progress",
-        (event) => {
-          if (event.payload.stage === "completed") {
-            void checkTerms();
-          }
-        },
-      );
-    };
-    void setup();
-    return () => {
-      if (unlisten) unlisten();
-    };
-  }, [checkTerms]);
+  // Chromium terms re-check removed - no longer needed in UI
 
   // Check permissions when they are initialized
   useEffect(() => {

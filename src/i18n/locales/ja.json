@@ -190,9 +190,9 @@
       "stopFollower": "{{leaderName}}のアクションを追従中",
       "desyncedTooltip": "{{url}}で同期に失敗しました",
       "paidFeature": "シンクロナイザーは有料機能です",
-      "chromiumOnly": "Chromiumプロフィールのみ同期可能です",
+      "chromiumOnly": "同期可能なプロフィールがありません",
       "selectFollowers": "フォロワープロフィールを選択",
-      "selectFollowersDesc": "リーダープロフィールのアクションを複製するプロフィールを選択してください。停止中のChromiumプロフィールのみ選択できます。",
+      "selectFollowersDesc": "リーダープロフィールのアクションを複製するプロフィールを選択してください。停止中のプロフィールのみ選択できます。",
       "leader": "リーダー",
       "follower": "フォロワー",
       "startSession": "同期セッションを開始",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "アンチ検出ブラウザ",
       "description": "アンチ検出機能を持つブラウザを選択",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Camoufox",
       "badge": "アンチ検出ブラウザ"
     },
@@ -238,11 +238,11 @@
       "latestAvailable": "最新バージョン ({{version}}) は利用可能です",
       "latestDownloading": "バージョン ({{version}}) をダウンロード中..."
     },
-    "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Fingerprint Chromium搭載",
+    "chromiumLabel": "Camoufox",
+    "chromiumSubtitle": "アンチ検出ブラウザ",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Camoufox搭載",
-    "camoufoxWarning": "Firefox（Camoufox）はサードパーティの組織によって管理されています。本番環境での使用にはChromiumをご利用ください。"
+    "camoufoxWarning": "Firefox（Camoufox）はサードパーティの組織によって管理されています。"
   },
   "deleteDialog": {
     "title": "プロファイルを削除",
@@ -469,7 +469,7 @@
       }
     },
     "chromium": {
-      "title": "Chromium設定",
+      "title": "ブラウザ設定",
       "fingerprint": {
         "title": "フィンガープリント",
         "randomize": "起動時にランダム化",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "chromium": "Chromium"
+    "chromium": "Camoufox"
   },
   "fingerprint": {
     "crossOsWarning": "異なるオペレーティングシステムのフィンガープリント偽装は、すべての基盤コンポーネントを完璧に模倣することが不可能なため、信頼性が低くなります。注意してご使用ください。",
@@ -799,9 +799,9 @@
     "extensionGroup": "拡張機能グループ",
     "compatibility": {
       "label": "互換性",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Firefox",
-      "both": "Chromium & Firefox"
+      "both": "Camoufox & Firefox"
     },
     "selectedFile": "選択されたファイル",
     "namePlaceholder": "拡張機能名",

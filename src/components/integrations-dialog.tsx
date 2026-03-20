@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useChromiumTerms } from "@/hooks/use-chromium-terms";
+// useChromiumTerms no longer needed - terms always accepted
 import { showErrorToast, showSuccessToast } from "@/lib/toast-utils";
 import { CopyToClipboard } from "./ui/copy-to-clipboard";
 
@@ -60,7 +60,8 @@ export function IntegrationsDialog({
   const [isApiStarting, setIsApiStarting] = useState(false);
   const [isMcpStarting, setIsMcpStarting] = useState(false);
 
-  const { termsAccepted } = useChromiumTerms();
+  // Terms always accepted - no chromium terms check needed
+  const termsAccepted = true;
 
   const loadSettings = useCallback(async () => {
     try {
@@ -309,7 +310,7 @@ export function IntegrationsDialog({
                 <Checkbox
                   id="mcp-enabled"
                   checked={settings.mcp_enabled && mcpConfig !== null}
-                  disabled={!termsAccepted || isMcpStarting}
+                  disabled={isMcpStarting}
                   onCheckedChange={handleMcpToggle}
                 />
                 <div className="grid gap-1.5 leading-none">
@@ -321,11 +322,6 @@ export function IntegrationsDialog({
                   </Label>
                   <p className="text-xs text-muted-foreground">
                     Allow AI assistants like Claude Desktop to control browsers.
-                    {!termsAccepted && (
-                      <span className="ml-1 text-warning">
-                        (Accept Chromium terms in Settings first)
-                      </span>
-                    )}
                   </p>
                 </div>
               </div>

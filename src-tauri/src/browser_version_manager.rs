@@ -50,7 +50,7 @@ impl BrowserVersionManager {
     &self,
     browser: &str,
   ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let (os, arch) = Self::get_platform_info();
+    let (_os, _arch) = Self::get_platform_info();
 
     match browser {
       "firefox" | "firefox-developer" => Ok(true),
@@ -63,13 +63,7 @@ impl BrowserVersionManager {
         Ok(true)
       }
       "camoufox" => Ok(true),
-      "chromium" | "wayfern" => {
-        // fingerprint-chromium supports Linux x64, Windows x64, and macOS (universal)
-        Ok(matches!(
-          (&os[..], &arch[..]),
-          ("linux", "x64") | ("windows", "x64") | ("macos", "x64") | ("macos", "arm64")
-        ))
-      }
+      "chromium" | "wayfern" => Ok(false),
       _ => Err(format!("Unknown browser: {browser}").into()),
     }
   }
@@ -81,9 +75,7 @@ impl BrowserVersionManager {
       "firefox-developer",
       "zen",
       "brave",
-      "chromium",
       "camoufox",
-      "wayfern",
     ];
 
     all_browsers

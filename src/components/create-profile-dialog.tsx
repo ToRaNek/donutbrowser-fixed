@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { GoPlus } from "react-icons/go";
 import { LuCheck, LuChevronsUpDown } from "react-icons/lu";
-import { ChromiumConfigForm } from "@/components/chromium-config-form";
 import { LoadingButton } from "@/components/loading-button";
 import { ProxyFormDialog } from "@/components/proxy-form-dialog";
 import { SharedCamoufoxConfigForm } from "@/components/shared-camoufox-config-form";
@@ -53,8 +52,6 @@ import type {
   BrowserReleaseTypes,
   CamoufoxConfig,
   CamoufoxOS,
-  ChromiumConfig,
-  ChromiumOS,
 } from "@/types";
 
 const getCurrentOS = (): CamoufoxOS => {
@@ -67,7 +64,7 @@ const getCurrentOS = (): CamoufoxOS => {
 
 import { RippleButton } from "./ui/ripple";
 
-type BrowserTypeString = "camoufox" | "chromium";
+type BrowserTypeString = "camoufox";
 
 interface CreateProfileDialogProps {
   isOpen: boolean;
@@ -80,7 +77,6 @@ interface CreateProfileDialogProps {
     proxyId?: string;
     vpnId?: string;
     camoufoxConfig?: CamoufoxConfig;
-    chromiumConfig?: ChromiumConfig;
     groupId?: string;
     extensionGroupId?: string;
     ephemeral?: boolean;
@@ -98,10 +94,6 @@ const browserOptions: BrowserOption[] = [
   {
     value: "camoufox",
     label: "Camoufox",
-  },
-  {
-    value: "chromium",
-    label: "Chromium",
   },
 ];
 
@@ -129,11 +121,6 @@ export function CreateProfileDialog({
   const [camoufoxConfig, setCamoufoxConfig] = useState<CamoufoxConfig>(() => ({
     geoip: true, // Default to automatic geoip
     os: getCurrentOS(), // Default to current OS
-  }));
-
-  // Chromium anti-detect states
-  const [chromiumConfig, setChromiumConfig] = useState<ChromiumConfig>(() => ({
-    os: getCurrentOS() as ChromiumOS, // Default to current OS
   }));
 
   // Handle browser selection from the initial screen
@@ -288,8 +275,8 @@ export function CreateProfileDialog({
       if (selectedBrowser) {
         void loadReleaseTypes(selectedBrowser);
       }
-      // Check and download GeoIP database if needed for Camoufox or Chromium
-      if (selectedBrowser === "camoufox" || selectedBrowser === "chromium") {
+      // Check and download GeoIP database if needed for Camoufox
+      if (selectedBrowser === "camoufox") {
         void checkAndDownloadGeoIPDatabase();
       }
     }
@@ -370,56 +357,30 @@ export function CreateProfileDialog({
       isVpnSelection && selectedProxyId ? selectedProxyId.slice(4) : undefined;
     try {
       if (activeTab === "anti-detect") {
-        // Anti-detect browser - check if Chromium or Camoufox is selected
-        if (selectedBrowser === "chromium") {
-          const bestChromiumVersion = getCreatableVersion("chromium");
-          if (!bestChromiumVersion) {
-            console.error("No Chromium version available");
-            return;
-          }
-
-          // The fingerprint will be generated at launch time by the Rust backend
-          const finalChromiumConfig = { ...chromiumConfig };
-
-          await onCreateProfile({
-            name: profileName.trim(),
-            browserStr: "chromium" as BrowserTypeString,
-            version: bestChromiumVersion.version,
-            releaseType: bestChromiumVersion.releaseType,
-            proxyId: resolvedProxyId,
-            vpnId: resolvedVpnId,
-            chromiumConfig: finalChromiumConfig,
-            groupId:
-              selectedGroupId !== "default" ? selectedGroupId : undefined,
-            extensionGroupId: selectedExtensionGroupId,
-            ephemeral,
-          });
-        } else {
-          // Default to Camoufox
-          const bestCamoufoxVersion = getCreatableVersion("camoufox");
-          if (!bestCamoufoxVersion) {
-            console.error("No Camoufox version available");
-            return;
-          }
-
-          // The fingerprint will be generated at launch time by the Rust backend
-          // We don't need to generate it here during profile creation
-          const finalCamoufoxConfig = { ...camoufoxConfig };
-
-          await onCreateProfile({
-            name: profileName.trim(),
-            browserStr: "camoufox" as BrowserTypeString,
-            version: bestCamoufoxVersion.version,
-            releaseType: bestCamoufoxVersion.releaseType,
-            proxyId: resolvedProxyId,
-            vpnId: resolvedVpnId,
-            camoufoxConfig: finalCamoufoxConfig,
-            groupId:
-              selectedGroupId !== "default" ? selectedGroupId : undefined,
-            extensionGroupId: selectedExtensionGroupId,
-            ephemeral,
-          });
+        // Anti-detect browser - only Camoufox is available for new profiles
+        const bestCamoufoxVersion = getCreatableVersion("camoufox");
+        if (!bestCamoufoxVersion) {
+          console.error("No Camoufox version available");
+          return;
         }
+
+        // The fingerprint will be generated at launch time by the Rust backend
+        // We don't need to generate it here during profile creation
+        const finalCamoufoxConfig = { ...camoufoxConfig };
+
+        await onCreateProfile({
+          name: profileName.trim(),
+          browserStr: "camoufox" as BrowserTypeString,
+          version: bestCamoufoxVersion.version,
+          releaseType: bestCamoufoxVersion.releaseType,
+          proxyId: resolvedProxyId,
+          vpnId: resolvedVpnId,
+          camoufoxConfig: finalCamoufoxConfig,
+          groupId:
+            selectedGroupId !== "default" ? selectedGroupId : undefined,
+          extensionGroupId: selectedExtensionGroupId,
+          ephemeral,
+        });
       } else {
         // Regular browser
         if (!selectedBrowser) {
@@ -469,19 +430,12 @@ export function CreateProfileDialog({
       geoip: true, // Reset to automatic geoip
       os: getCurrentOS(), // Reset to current OS
     });
-    setChromiumConfig({
-      os: getCurrentOS() as ChromiumOS, // Reset to current OS
-    });
     setEphemeral(false);
     onClose();
   };
 
   const updateCamoufoxConfig = (key: keyof CamoufoxConfig, value: unknown) => {
     setCamoufoxConfig((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const updateChromiumConfig = (key: keyof ChromiumConfig, value: unknown) => {
-    setChromiumConfig((prev) => ({ ...prev, [key]: value }));
   };
 
   // Check if browser version is downloaded and available
@@ -528,10 +482,7 @@ export function CreateProfileDialog({
             {currentStep === "browser-selection"
               ? t("createProfile.title")
               : t("createProfile.configureTitle", {
-                  browser:
-                    selectedBrowser === "chromium"
-                      ? t("createProfile.chromiumLabel")
-                      : t("createProfile.firefoxLabel"),
+                  browser: t("createProfile.firefoxLabel"),
                 })}
           </DialogTitle>
         </DialogHeader>
@@ -551,31 +502,7 @@ export function CreateProfileDialog({
                     <TabsContent value="anti-detect" className="mt-0 space-y-6">
                       {/* Anti-Detect Browser Selection */}
                       <div className="space-y-3 pt-8">
-                        {/* Chromium - First */}
-                        <Button
-                          onClick={() => handleBrowserSelect("chromium")}
-                          className="flex gap-3 justify-start items-center p-4 w-full h-16 border-2 transition-colors hover:border-primary/50"
-                          variant="outline"
-                        >
-                          <div className="flex justify-center items-center w-8 h-8">
-                            {(() => {
-                              const IconComponent = getBrowserIcon("chromium");
-                              return IconComponent ? (
-                                <IconComponent className="w-6 h-6" />
-                              ) : null;
-                            })()}
-                          </div>
-                          <div className="text-left">
-                            <div className="font-medium">
-                              {t("createProfile.chromiumLabel")}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {t("createProfile.chromiumSubtitle")}
-                            </div>
-                          </div>
-                        </Button>
-
-                        {/* Camoufox (Firefox) - Second */}
+                        {/* Camoufox (Firefox) */}
                         <Button
                           onClick={() => handleBrowserSelect("camoufox")}
                           className="flex gap-3 justify-start items-center p-4 w-full h-16 border-2 transition-colors hover:border-primary/50"
@@ -693,109 +620,7 @@ export function CreateProfileDialog({
                           </p>
                         </div>
 
-                        {selectedBrowser === "chromium" ? (
-                          // Chromium Configuration
-                          <div className="space-y-6">
-                            {/* Chromium Download Status */}
-                            {isLoadingReleaseTypes && (
-                              <div className="flex gap-3 items-center p-3 rounded-md border">
-                                <div className="w-4 h-4 rounded-full border-2 animate-spin border-muted/40 border-t-primary" />
-                                <p className="text-sm text-muted-foreground">
-                                  Fetching available versions...
-                                </p>
-                              </div>
-                            )}
-                            {!isLoadingReleaseTypes && releaseTypesError && (
-                              <div className="flex gap-3 items-center p-3 rounded-md border border-destructive/50 bg-destructive/10">
-                                <p className="flex-1 text-sm text-destructive">
-                                  {releaseTypesError}
-                                </p>
-                                <RippleButton
-                                  onClick={() =>
-                                    selectedBrowser &&
-                                    loadReleaseTypes(selectedBrowser)
-                                  }
-                                  size="sm"
-                                  variant="outline"
-                                >
-                                  Retry
-                                </RippleButton>
-                              </div>
-                            )}
-                            {!isLoadingReleaseTypes &&
-                              !releaseTypesError &&
-                              !getBestAvailableVersion("chromium") && (
-                                <div className="flex gap-3 items-center p-3 rounded-md border border-warning/50 bg-warning/10">
-                                  <p className="text-sm text-warning">
-                                    Chromium is not available on your platform
-                                    yet.
-                                  </p>
-                                </div>
-                              )}
-                            {!isLoadingReleaseTypes &&
-                              !releaseTypesError &&
-                              !isBrowserCurrentlyDownloading("chromium") &&
-                              !isBrowserVersionAvailable("chromium") &&
-                              getBestAvailableVersion("chromium") && (
-                                <div className="flex gap-3 items-center p-3 rounded-md border">
-                                  <p className="text-sm text-muted-foreground">
-                                    {(() => {
-                                      const bestVersion =
-                                        getBestAvailableVersion("chromium");
-                                      return `Chromium version (${bestVersion?.version}) needs to be downloaded`;
-                                    })()}
-                                  </p>
-                                  <LoadingButton
-                                    onClick={() => handleDownload("chromium")}
-                                    isLoading={isBrowserCurrentlyDownloading(
-                                      "chromium",
-                                    )}
-                                    size="sm"
-                                    disabled={isBrowserCurrentlyDownloading(
-                                      "chromium",
-                                    )}
-                                  >
-                                    {isBrowserCurrentlyDownloading("chromium")
-                                      ? "Downloading..."
-                                      : "Download"}
-                                  </LoadingButton>
-                                </div>
-                              )}
-                            {!isLoadingReleaseTypes &&
-                              !releaseTypesError &&
-                              !isBrowserCurrentlyDownloading("chromium") &&
-                              isBrowserVersionAvailable("chromium") && (
-                                <div className="p-3 text-sm rounded-md border text-muted-foreground">
-                                  {(() => {
-                                    const bestVersion =
-                                      getBestAvailableVersion("chromium");
-                                    return `Chromium version (${bestVersion?.version}) is available`;
-                                  })()}
-                                </div>
-                              )}
-                            {isBrowserCurrentlyDownloading("chromium") && (
-                              <div className="p-3 text-sm rounded-md border text-muted-foreground">
-                                {(() => {
-                                  const bestVersion =
-                                    getBestAvailableVersion("chromium");
-                                  return `Downloading Chromium version (${bestVersion?.version})...`;
-                                })()}
-                              </div>
-                            )}
-
-                            <ChromiumConfigForm
-                              config={chromiumConfig}
-                              onConfigChange={updateChromiumConfig}
-                              isCreating
-                              crossOsUnlocked={crossOsUnlocked}
-                              limitedMode={!crossOsUnlocked}
-                              profileVersion={
-                                getBestAvailableVersion("chromium")?.version
-                              }
-                              profileBrowser="chromium"
-                            />
-                          </div>
-                        ) : selectedBrowser === "camoufox" ? (
+                        {selectedBrowser === "camoufox" ? (
                           // Camoufox Configuration
                           <div className="space-y-6">
                             {/* Camoufox Download Status */}

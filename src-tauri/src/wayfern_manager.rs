@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::browser_runner::BrowserRunner;
 use crate::profile::BrowserProfile;
 use reqwest::Client;

@@ -190,9 +190,9 @@
       "stopFollower": "正在跟随 {{leaderName}} 的操作",
       "desyncedTooltip": "在 {{url}} 同步失败",
       "paidFeature": "同步器是付费功能",
-      "chromiumOnly": "只有 Chromium 配置文件可以同步",
+      "chromiumOnly": "没有可用于同步的配置文件",
       "selectFollowers": "选择跟随者配置文件",
-      "selectFollowersDesc": "选择将复制领导者配置文件操作的配置文件。只能选择已停止的 Chromium 配置文件。",
+      "selectFollowersDesc": "选择将复制领导者配置文件操作的配置文件。只能选择已停止的配置文件。",
       "leader": "领导者",
       "follower": "跟随者",
       "startSession": "开始同步会话",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "防检测浏览器",
       "description": "选择具有防检测功能的浏览器",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Camoufox",
       "badge": "防检测浏览器"
     },
@@ -238,11 +238,11 @@
       "latestAvailable": "最新版本 ({{version}}) 可用",
       "latestDownloading": "正在下载版本 ({{version}})..."
     },
-    "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "由 Fingerprint Chromium 驱动",
+    "chromiumLabel": "Camoufox",
+    "chromiumSubtitle": "防检测浏览器",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "由 Camoufox 驱动",
-    "camoufoxWarning": "Firefox（Camoufox）由第三方组织维护。在生产环境中，请使用 Chromium。"
+    "camoufoxWarning": "Firefox（Camoufox）由第三方组织维护。"
   },
   "deleteDialog": {
     "title": "删除配置文件",
@@ -469,7 +469,7 @@
       }
     },
     "chromium": {
-      "title": "Chromium 配置",
+      "title": "浏览器配置",
       "fingerprint": {
         "title": "指纹",
         "randomize": "启动时随机化",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "chromium": "Chromium"
+    "chromium": "Camoufox"
   },
   "fingerprint": {
     "crossOsWarning": "伪装不同操作系统的指纹不太可靠，因为不可能完美模拟所有底层组件。请谨慎使用。",
@@ -799,9 +799,9 @@
     "extensionGroup": "扩展程序组",
     "compatibility": {
       "label": "兼容性",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Firefox",
-      "both": "Chromium 和 Firefox"
+      "both": "Camoufox 和 Firefox"
     },
     "selectedFile": "已选文件",
     "namePlaceholder": "扩展程序名称",

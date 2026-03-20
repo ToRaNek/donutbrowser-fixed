@@ -14,21 +14,18 @@ pub struct ProxySettings {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BrowserType {
   Camoufox,
-  Chromium,
 }
 
 impl BrowserType {
   pub fn as_str(&self) -> &'static str {
     match self {
       BrowserType::Camoufox => "camoufox",
-      BrowserType::Chromium => "chromium",
     }
   }
 
   pub fn from_str(s: &str) -> Result<Self, String> {
     match s {
       "camoufox" => Ok(BrowserType::Camoufox),
-      "chromium" | "wayfern" => Ok(BrowserType::Chromium),
       _ => Err(format!("Unknown browser type: {s}")),
     }
   }
@@ -183,47 +180,6 @@ mod macos {
     Ok(executable_path)
   }
 
-  pub fn get_chromium_executable_path(
-    install_dir: &Path,
-  ) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    // Wayfern is Chromium-based, look for Chromium.app
-    // Find the .app directory
-    let app_path = std::fs::read_dir(install_dir)?
-      .filter_map(Result::ok)
-      .find(|entry| entry.path().extension().is_some_and(|ext| ext == "app"))
-      .ok_or("Wayfern app not found")?;
-
-    // Construct the browser executable path
-    let mut executable_dir = app_path.path();
-    executable_dir.push("Contents");
-    executable_dir.push("MacOS");
-
-    // Find the Chromium executable
-    let executable_path = std::fs::read_dir(&executable_dir)?
-      .filter_map(Result::ok)
-      .find(|entry| {
-        let binding = entry.file_name();
-        let name = binding.to_string_lossy();
-        name.contains("Chromium") || name == "Wayfern"
-      })
-      .map(|entry| entry.path())
-      .ok_or("No Wayfern executable found in MacOS directory")?;
-
-    Ok(executable_path)
-  }
-
-  pub fn is_chromium_version_downloaded(install_dir: &Path) -> bool {
-    // On macOS, check for .app files (Chromium.app)
-    if let Ok(entries) = std::fs::read_dir(install_dir) {
-      for entry in entries.flatten() {
-        if entry.path().extension().is_some_and(|ext| ext == "app") {
-          return true;
-        }
-      }
-    }
-    false
-  }
-
   pub fn is_firefox_version_downloaded(install_dir: &Path) -> bool {
     // On macOS, check for .app files
     if let Ok(entries) = std::fs::read_dir(install_dir) {
@@ -266,7 +222,6 @@ mod linux {
           install_dir.join("camoufox"),
         ]
       }
-      _ => vec![],
     };
 
     for executable_path in &possible_executables {
@@ -280,40 +235,6 @@ mod linux {
         "Executable not found for {} in {}",
         browser_type.as_str(),
         install_dir.display(),
-      )
-      .into(),
-    )
-  }
-
-  pub fn get_chromium_executable_path(
-    install_dir: &Path,
-    browser_type: &BrowserType,
-  ) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let possible_executables = match browser_type {
-      BrowserType::Chromium => vec![
-        install_dir.join("chromium"),
-        install_dir.join("chrome"),
-        install_dir.join("wayfern"),
-        install_dir.join("chromium").join("chromium"),
-        install_dir.join("chromium").join("chrome"),
-        install_dir.join("wayfern").join("chromium"),
-        install_dir.join("wayfern").join("chrome"),
-        install_dir.join("chrome-linux").join("chrome"),
-      ],
-      _ => vec![],
-    };
-
-    for executable_path in &possible_executables {
-      if executable_path.exists() && executable_path.is_file() {
-        return Ok(executable_path.clone());
-      }
-    }
-
-    Err(
-      format!(
-        "Chromium executable not found in {}/{}",
-        install_dir.display(),
-        browser_type.as_str()
       )
       .into(),
     )
@@ -333,31 +254,6 @@ mod linux {
           install_dir.join("camoufox"),
         ]
       }
-      _ => vec![],
-    };
-
-    for exe_path in &possible_executables {
-      if exe_path.exists() && exe_path.is_file() {
-        return true;
-      }
-    }
-
-    false
-  }
-
-  pub fn is_chromium_version_downloaded(install_dir: &Path, browser_type: &BrowserType) -> bool {
-    let possible_executables = match browser_type {
-      BrowserType::Chromium => vec![
-        install_dir.join("chromium"),
-        install_dir.join("chrome"),
-        install_dir.join("wayfern"),
-        install_dir.join("chromium").join("chromium"),
-        install_dir.join("chromium").join("chrome"),
-        install_dir.join("wayfern").join("chromium"),
-        install_dir.join("wayfern").join("chrome"),
-        install_dir.join("chrome-linux").join("chrome"),
-      ],
-      _ => vec![],
     };
 
     for exe_path in &possible_executables {
@@ -432,52 +328,6 @@ mod windows {
     Err("Firefox executable not found in Windows installation directory".into())
   }
 
-  pub fn get_chromium_executable_path(
-    install_dir: &Path,
-    browser_type: &BrowserType,
-  ) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    // On Windows, look for .exe files
-    let possible_paths = match browser_type {
-      BrowserType::Chromium => vec![
-        install_dir.join("chromium.exe"),
-        install_dir.join("chrome.exe"),
-        install_dir.join("wayfern.exe"),
-        install_dir.join("bin").join("chromium.exe"),
-        install_dir.join("chromium").join("chromium.exe"),
-        install_dir.join("chromium").join("chrome.exe"),
-        install_dir.join("wayfern").join("chromium.exe"),
-        install_dir.join("wayfern").join("chrome.exe"),
-        install_dir.join("chrome-win").join("chrome.exe"),
-      ],
-      _ => vec![],
-    };
-
-    for path in &possible_paths {
-      if path.exists() && path.is_file() {
-        return Ok(path.clone());
-      }
-    }
-
-    // Look for any .exe file that might be the browser
-    if let Ok(entries) = std::fs::read_dir(install_dir) {
-      for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().is_some_and(|ext| ext == "exe") && is_pe_executable(&path) {
-          let name = path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_lowercase();
-          if name.contains("chromium") || name.contains("chrome") || name.contains("wayfern") {
-            return Ok(path);
-          }
-        }
-      }
-    }
-
-    Err("Chromium executable not found in Windows installation directory".into())
-  }
-
   pub fn is_firefox_version_downloaded(install_dir: &Path) -> bool {
     // On Windows, check for .exe files
     let possible_executables = [
@@ -505,50 +355,6 @@ mod windows {
             .to_lowercase();
           if name.starts_with("firefox") || name.starts_with("camoufox") || name.contains("browser")
           {
-            return true;
-          }
-        }
-      }
-    }
-
-    false
-  }
-
-  pub fn is_chromium_version_downloaded(install_dir: &Path, browser_type: &BrowserType) -> bool {
-    // On Windows, check for .exe files
-    let possible_executables = match browser_type {
-      BrowserType::Chromium => vec![
-        install_dir.join("chromium.exe"),
-        install_dir.join("chrome.exe"),
-        install_dir.join("wayfern.exe"),
-        install_dir.join("bin").join("chromium.exe"),
-        install_dir.join("chromium").join("chromium.exe"),
-        install_dir.join("chromium").join("chrome.exe"),
-        install_dir.join("wayfern").join("chromium.exe"),
-        install_dir.join("wayfern").join("chrome.exe"),
-        install_dir.join("chrome-win").join("chrome.exe"),
-      ],
-      _ => vec![],
-    };
-
-    for exe_path in &possible_executables {
-      if exe_path.exists() && exe_path.is_file() {
-        return true;
-      }
-    }
-
-    // Check for any .exe file that looks like the browser
-    if let Ok(entries) = std::fs::read_dir(install_dir) {
-      for entry in entries.flatten() {
-        let path = entry.path();
-
-        if path.extension().is_some_and(|ext| ext == "exe") && is_pe_executable(&path) {
-          let name = path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_lowercase();
-          if name.contains("chromium") || name.contains("chrome") || name.contains("wayfern") {
             return true;
           }
         }
@@ -653,128 +459,6 @@ impl Browser for CamoufoxBrowser {
   }
 }
 
-/// Chromium is a Chromium-based anti-detect browser with CDP-based fingerprint injection
-pub struct ChromiumBrowser;
-
-impl ChromiumBrowser {
-  pub fn new() -> Self {
-    Self
-  }
-}
-
-impl Browser for ChromiumBrowser {
-  fn get_executable_path(&self, install_dir: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    #[cfg(target_os = "macos")]
-    return macos::get_chromium_executable_path(install_dir);
-
-    #[cfg(target_os = "linux")]
-    return linux::get_chromium_executable_path(install_dir, &BrowserType::Chromium);
-
-    #[cfg(target_os = "windows")]
-    return windows::get_chromium_executable_path(install_dir, &BrowserType::Chromium);
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    Err("Unsupported platform".into())
-  }
-
-  fn create_launch_args(
-    &self,
-    profile_path: &str,
-    proxy_settings: Option<&ProxySettings>,
-    url: Option<String>,
-    remote_debugging_port: Option<u16>,
-    headless: bool,
-  ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    // Wayfern uses Chromium-style arguments
-    let mut args = vec![
-      format!("--user-data-dir={}", profile_path),
-      "--no-default-browser-check".to_string(),
-      "--disable-background-mode".to_string(),
-      "--disable-component-update".to_string(),
-      "--disable-background-timer-throttling".to_string(),
-      "--crash-server-url=".to_string(),
-      "--disable-updater".to_string(),
-      "--disable-session-crashed-bubble".to_string(),
-      "--hide-crash-restore-bubble".to_string(),
-      "--disable-infobars".to_string(),
-      "--disable-quic".to_string(),
-      "--disable-features=DialMediaRouteProvider".to_string(),
-      "--use-mock-keychain".to_string(),
-      "--password-store=basic".to_string(),
-      // Ensure WebGL works via SwiftShader software rendering on GPU-less environments
-      "--use-gl=angle".to_string(),
-      "--use-angle=swiftshader-webgl".to_string(),
-      "--enable-unsafe-swiftshader".to_string(),
-    ];
-
-    // Add remote debugging port
-    if let Some(port) = remote_debugging_port {
-      args.push("--remote-debugging-address=127.0.0.1".to_string());
-      args.push(format!("--remote-debugging-port={port}"));
-    }
-
-    // Add headless mode if requested
-    if headless {
-      args.push("--headless=new".to_string());
-    }
-
-    // Add proxy configuration if provided
-    if let Some(proxy) = proxy_settings {
-      args.push(format!(
-        "--proxy-server=http://{}:{}",
-        proxy.host, proxy.port
-      ));
-    }
-
-    if let Some(url) = url {
-      args.push(url);
-    }
-
-    Ok(args)
-  }
-
-  fn is_version_downloaded(&self, version: &str, binaries_dir: &Path) -> bool {
-    let install_dir = binaries_dir.join("chromium").join(version);
-    // Also check legacy "wayfern" directory for backward compatibility
-    let legacy_install_dir = binaries_dir.join("wayfern").join(version);
-
-    #[cfg(target_os = "macos")]
-    {
-      return macos::is_chromium_version_downloaded(&install_dir)
-        || macos::is_chromium_version_downloaded(&legacy_install_dir);
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-      linux::is_chromium_version_downloaded(&install_dir, &BrowserType::Chromium)
-        || linux::is_chromium_version_downloaded(&legacy_install_dir, &BrowserType::Chromium)
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-      windows::is_chromium_version_downloaded(&install_dir, &BrowserType::Chromium)
-        || windows::is_chromium_version_downloaded(&legacy_install_dir, &BrowserType::Chromium)
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    false
-  }
-
-  fn prepare_executable(&self, executable_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(target_os = "macos")]
-    return macos::prepare_executable(executable_path);
-
-    #[cfg(target_os = "linux")]
-    return linux::prepare_executable(executable_path);
-
-    #[cfg(target_os = "windows")]
-    return windows::prepare_executable(executable_path);
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    Err("Unsupported platform".into())
-  }
-}
-
 pub struct BrowserFactory;
 
 impl BrowserFactory {
@@ -789,7 +473,6 @@ impl BrowserFactory {
   pub fn create_browser(&self, browser_type: BrowserType) -> Box<dyn Browser> {
     match browser_type {
       BrowserType::Camoufox => Box::new(CamoufoxBrowser::new()),
-      BrowserType::Chromium => Box::new(ChromiumBrowser::new()),
     }
   }
 }
@@ -798,6 +481,7 @@ impl BrowserFactory {
 /// Returns false for archive files (.zip starts with PK, etc.) that were
 /// incorrectly named with a .exe extension.
 #[cfg(target_os = "windows")]
+#[allow(dead_code)]
 fn is_pe_executable(path: &Path) -> bool {
   use std::io::Read;
   let Ok(mut file) = std::fs::File::open(path) else {
@@ -882,21 +566,11 @@ mod tests {
   fn test_browser_type_conversions() {
     // Test as_str
     assert_eq!(BrowserType::Camoufox.as_str(), "camoufox");
-    assert_eq!(BrowserType::Chromium.as_str(), "chromium");
 
     // Test from_str
     assert_eq!(
       BrowserType::from_str("camoufox").expect("camoufox should be valid"),
       BrowserType::Camoufox
-    );
-    assert_eq!(
-      BrowserType::from_str("chromium").expect("chromium should be valid"),
-      BrowserType::Chromium
-    );
-    // Backward compat: "wayfern" should still parse to Chromium
-    assert_eq!(
-      BrowserType::from_str("wayfern").expect("wayfern should be valid for backward compat"),
-      BrowserType::Chromium
     );
 
     // Test invalid browser type - these should properly fail
@@ -912,6 +586,16 @@ mod tests {
     assert!(
       BrowserType::from_str("firefox").is_err(),
       "Removed browser types should return error"
+    );
+
+    assert!(
+      BrowserType::from_str("chromium").is_err(),
+      "Chromium should return error (removed)"
+    );
+
+    assert!(
+      BrowserType::from_str("wayfern").is_err(),
+      "Wayfern should return error (removed)"
     );
   }
 
@@ -950,67 +634,6 @@ mod tests {
     assert!(
       args.contains(&"--headless".to_string()),
       "Browser should include headless flag when requested"
-    );
-  }
-
-  #[test]
-  fn test_chromium_launch_args() {
-    let browser = ChromiumBrowser::new();
-    let args = browser
-      .create_launch_args("/path/to/profile", None, None, None, false)
-      .expect("Failed to create launch args for Chromium");
-
-    assert!(
-      args.contains(&"--user-data-dir=/path/to/profile".to_string()),
-      "Chromium args should contain user-data-dir"
-    );
-    assert!(
-      args.contains(&"--no-default-browser-check".to_string()),
-      "Chromium args should contain no-default-browser-check"
-    );
-    assert!(
-      args.contains(&"--disable-background-mode".to_string()),
-      "Chromium args should contain disable-background-mode"
-    );
-    assert!(
-      args.contains(&"--disable-component-update".to_string()),
-      "Chromium args should contain disable-component-update"
-    );
-
-    let args_with_url = browser
-      .create_launch_args(
-        "/path/to/profile",
-        None,
-        Some("https://example.com".to_string()),
-        None,
-        false,
-      )
-      .expect("Failed to create launch args for Chromium with URL");
-    assert!(
-      args_with_url.contains(&"https://example.com".to_string()),
-      "Chromium args should contain the URL"
-    );
-    assert_eq!(
-      args_with_url.last().expect("Args should not be empty"),
-      "https://example.com"
-    );
-
-    // Test remote debugging
-    let args_with_debug = browser
-      .create_launch_args("/path/to/profile", None, None, Some(9222), false)
-      .expect("Failed to create launch args for Chromium with remote debugging");
-    assert!(
-      args_with_debug.contains(&"--remote-debugging-port=9222".to_string()),
-      "Chromium args should contain remote debugging port"
-    );
-
-    // Test headless mode
-    let args_headless = browser
-      .create_launch_args("/path/to/profile", None, None, None, true)
-      .expect("Failed to create launch args for Chromium headless");
-    assert!(
-      args_headless.contains(&"--headless=new".to_string()),
-      "Chromium args should contain headless flag when requested"
     );
   }
 
@@ -1081,56 +704,6 @@ mod tests {
     let browser = CamoufoxBrowser::new();
     assert!(browser.is_version_downloaded("135.0.1", binaries_dir));
     assert!(!browser.is_version_downloaded("999.0", binaries_dir));
-
-    // Test with Chromium browser
-    let wayfern_dir = binaries_dir.join("chromium").join("1.0.0");
-    fs::create_dir_all(&wayfern_dir).expect("Failed to create chromium directory");
-
-    #[cfg(target_os = "macos")]
-    {
-      let wayfern_app_dir = wayfern_dir.join("Chromium.app");
-      fs::create_dir_all(wayfern_app_dir.join("Contents").join("MacOS"))
-        .expect("Failed to create Chromium.app structure");
-
-      let executable_path = wayfern_app_dir
-        .join("Contents")
-        .join("MacOS")
-        .join("Chromium");
-      fs::write(&executable_path, "mock executable")
-        .expect("Failed to write mock Wayfern executable");
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-      let executable_path = wayfern_dir.join("chromium");
-      fs::write(&executable_path, "mock executable")
-        .expect("Failed to write mock wayfern executable");
-
-      use std::os::unix::fs::PermissionsExt;
-      let mut permissions = executable_path
-        .metadata()
-        .expect("Failed to get wayfern metadata")
-        .permissions();
-      permissions.set_mode(0o755);
-      fs::set_permissions(&executable_path, permissions)
-        .expect("Failed to set wayfern permissions");
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-      let executable_path = wayfern_dir.join("chromium.exe");
-      fs::write(&executable_path, "mock executable").expect("Failed to write mock chromium.exe");
-    }
-
-    let chromium_browser = ChromiumBrowser::new();
-    assert!(
-      chromium_browser.is_version_downloaded("1.0.0", binaries_dir),
-      "Chromium version should be detected as downloaded"
-    );
-    assert!(
-      !chromium_browser.is_version_downloaded("9.9.9", binaries_dir),
-      "Non-existent Chromium version should not be detected as downloaded"
-    );
   }
 
   #[test]

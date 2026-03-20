@@ -9,7 +9,6 @@ use crate::downloaded_browsers_registry::DownloadedBrowsersRegistry;
 use crate::profile::types::{get_host_os, BrowserProfile, SyncMode};
 use crate::profile::ProfileManager;
 use crate::proxy_manager::PROXY_MANAGER;
-use crate::wayfern_manager::ChromiumConfig;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DetectedProfile {
@@ -22,11 +21,9 @@ pub struct DetectedProfile {
 
 fn map_browser_type(browser: &str) -> &str {
   match browser {
-    "firefox" | "firefox-developer" | "zen" => "camoufox",
-    "chromium" | "brave" => "wayfern",
+    "firefox" | "firefox-developer" | "zen" | "chromium" | "brave" | "wayfern" => "camoufox",
     "camoufox" => "camoufox",
-    "wayfern" => "wayfern",
-    _ => "wayfern",
+    _ => "camoufox",
   }
 }
 
@@ -35,7 +32,6 @@ pub struct ProfileImporter {
   downloaded_browsers_registry: &'static DownloadedBrowsersRegistry,
   profile_manager: &'static ProfileManager,
   camoufox_manager: &'static crate::camoufox_manager::CamoufoxManager,
-  chromium_manager: &'static crate::wayfern_manager::ChromiumManager,
 }
 
 impl ProfileImporter {
@@ -45,7 +41,6 @@ impl ProfileImporter {
       downloaded_browsers_registry: DownloadedBrowsersRegistry::instance(),
       profile_manager: ProfileManager::instance(),
       camoufox_manager: crate::camoufox_manager::CamoufoxManager::instance(),
-      chromium_manager: crate::wayfern_manager::ChromiumManager::instance(),
     }
   }
 
@@ -485,7 +480,7 @@ impl ProfileImporter {
     }
   }
 
-  #[allow(clippy::too_many_arguments)]
+  #[allow(clippy::too_many_arguments, unused_variables)]
   pub async fn import_profile(
     &self,
     app_handle: &tauri::AppHandle,
@@ -494,7 +489,7 @@ impl ProfileImporter {
     new_profile_name: &str,
     proxy_id: Option<String>,
     camoufox_config: Option<CamoufoxConfig>,
-    chromium_config: Option<ChromiumConfig>,
+    chromium_config: Option<serde_json::Value>,
   ) -> Result<(), Box<dyn std::error::Error>> {
     let source_path = Path::new(source_path);
     if !source_path.exists() {
@@ -628,104 +623,6 @@ impl ProfileImporter {
       None
     };
 
-    let final_chromium_config = if mapped == "wayfern" {
-      let mut config = chromium_config.unwrap_or_default();
-
-      if config.executable_path.is_none() {
-        let mut browser_dir = self.profile_manager.get_binaries_dir();
-        browser_dir.push(mapped);
-        browser_dir.push(&version);
-
-        #[cfg(target_os = "macos")]
-        let binary_path = browser_dir
-          .join("Chromium.app")
-          .join("Contents")
-          .join("MacOS")
-          .join("Chromium");
-
-        #[cfg(target_os = "windows")]
-        let binary_path = browser_dir.join("chrome.exe");
-
-        #[cfg(target_os = "linux")]
-        let binary_path = browser_dir.join("chrome");
-
-        config.executable_path = Some(binary_path.to_string_lossy().to_string());
-      }
-
-      if let Some(ref proxy_id_val) = proxy_id {
-        if let Some(proxy_settings) = PROXY_MANAGER.get_proxy_settings_by_id(proxy_id_val) {
-          let proxy_url = if let (Some(username), Some(password)) =
-            (&proxy_settings.username, &proxy_settings.password)
-          {
-            format!(
-              "{}://{}:{}@{}:{}",
-              proxy_settings.proxy_type.to_lowercase(),
-              username,
-              password,
-              proxy_settings.host,
-              proxy_settings.port
-            )
-          } else {
-            format!(
-              "{}://{}:{}",
-              proxy_settings.proxy_type.to_lowercase(),
-              proxy_settings.host,
-              proxy_settings.port
-            )
-          };
-          config.proxy = Some(proxy_url);
-        }
-      }
-
-      if config.fingerprint.is_none() {
-        let temp_profile = BrowserProfile {
-          id: uuid::Uuid::new_v4(),
-          name: new_profile_name.to_string(),
-          browser: mapped.to_string(),
-          version: version.clone(),
-          proxy_id: proxy_id.clone(),
-          vpn_id: None,
-          process_id: None,
-          last_launch: None,
-          release_type: "stable".to_string(),
-          camoufox_config: None,
-          chromium_config: None,
-          group_id: None,
-          tags: Vec::new(),
-          note: None,
-          sync_mode: SyncMode::Disabled,
-          encryption_salt: None,
-          last_sync: None,
-          host_os: None,
-          ephemeral: false,
-          extension_group_id: None,
-          proxy_bypass_rules: Vec::new(),
-          created_by_id: None,
-          created_by_email: None,
-        };
-
-        match self
-          .chromium_manager
-          .generate_fingerprint_config(app_handle, &temp_profile, &config)
-          .await
-        {
-          Ok(fp) => config.fingerprint = Some(fp),
-          Err(e) => {
-            return Err(
-              format!(
-                "Failed to generate fingerprint for imported profile '{new_profile_name}': {e}"
-              )
-              .into(),
-            );
-          }
-        }
-      }
-
-      config.proxy = None;
-      Some(config)
-    } else {
-      None
-    };
 
     let profile = BrowserProfile {
       id: profile_id,
@@ -738,7 +635,7 @@ impl ProfileImporter {
       last_launch: None,
       release_type: "stable".to_string(),
       camoufox_config: final_camoufox_config,
-      chromium_config: final_chromium_config,
+      chromium_config: None,
       group_id: None,
       tags: Vec::new(),
       note: None,
@@ -826,12 +723,11 @@ pub async fn import_browser_profile(
   new_profile_name: String,
   proxy_id: Option<String>,
   camoufox_config: Option<CamoufoxConfig>,
-  chromium_config: Option<ChromiumConfig>,
+  chromium_config: Option<serde_json::Value>,
 ) -> Result<(), String> {
   let fingerprint_os = camoufox_config
     .as_ref()
-    .and_then(|c| c.os.as_deref())
-    .or_else(|| chromium_config.as_ref().and_then(|c| c.os.as_deref()));
+    .and_then(|c| c.os.as_deref());
 
   if !crate::cloud_auth::CLOUD_AUTH
     .is_fingerprint_os_allowed(fingerprint_os)
@@ -903,11 +799,11 @@ mod tests {
     assert_eq!(map_browser_type("firefox"), "camoufox");
     assert_eq!(map_browser_type("firefox-developer"), "camoufox");
     assert_eq!(map_browser_type("zen"), "camoufox");
-    assert_eq!(map_browser_type("chromium"), "wayfern");
-    assert_eq!(map_browser_type("brave"), "wayfern");
+    assert_eq!(map_browser_type("chromium"), "camoufox");
+    assert_eq!(map_browser_type("brave"), "camoufox");
     assert_eq!(map_browser_type("camoufox"), "camoufox");
-    assert_eq!(map_browser_type("wayfern"), "wayfern");
-    assert_eq!(map_browser_type("something_else"), "wayfern");
+    assert_eq!(map_browser_type("wayfern"), "camoufox");
+    assert_eq!(map_browser_type("something_else"), "camoufox");
   }
 
   #[test]

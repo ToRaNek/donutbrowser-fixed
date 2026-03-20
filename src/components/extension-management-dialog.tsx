@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FaChrome, FaFirefox } from "react-icons/fa";
+import { FaFirefox } from "react-icons/fa";
 import { GoPlus } from "react-icons/go";
 import {
   LuExternalLink,
@@ -476,7 +476,7 @@ export function ExtensionManagementDialog({
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="inline-flex">
-                <FaChrome className="w-3.5 h-3.5 text-muted-foreground" />
+                <FaFirefox className="w-3.5 h-3.5 text-muted-foreground" />
               </span>
             </TooltipTrigger>
             <TooltipContent>

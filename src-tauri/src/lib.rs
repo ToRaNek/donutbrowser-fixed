@@ -24,7 +24,7 @@ mod downloader;
 mod ephemeral_dirs;
 mod extension_manager;
 mod extraction;
-mod fingerprint_data;
+// mod fingerprint_data; // Removed: was for Chromium font/webgl spoofing
 pub mod fpgen;
 mod geoip_downloader;
 mod group_manager;
@@ -66,7 +66,7 @@ use browser_runner::{
 
 use profile::manager::{
   check_browser_status, clone_profile, create_browser_profile_new, delete_profile,
-  list_browser_profiles, rename_profile, update_camoufox_config, update_chromium_config,
+  list_browser_profiles, rename_profile, update_camoufox_config,
   update_profile_note, update_profile_proxy, update_profile_proxy_bypass_rules,
   update_profile_tags, update_profile_vpn,
 };
@@ -435,23 +435,6 @@ async fn export_profile_cookies(profile_id: String, format: String) -> Result<St
     return Err("Cookie export requires an active Pro subscription".to_string());
   }
   cookie_manager::CookieManager::export_cookies(&profile_id, &format)
-}
-
-#[tauri::command]
-fn check_chromium_terms_accepted() -> bool {
-  wayfern_terms::ChromiumTermsManager::instance().is_terms_accepted()
-}
-
-#[tauri::command]
-fn check_chromium_downloaded() -> bool {
-  wayfern_terms::ChromiumTermsManager::instance().is_chromium_downloaded()
-}
-
-#[tauri::command]
-async fn accept_chromium_terms() -> Result<(), String> {
-  wayfern_terms::ChromiumTermsManager::instance()
-    .accept_terms()
-    .await
 }
 
 #[tauri::command]
@@ -898,14 +881,6 @@ async fn generate_sample_fingerprint(
     let config: crate::camoufox_manager::CamoufoxConfig =
       serde_json::from_str(&config_json).map_err(|e| format!("Failed to parse config: {e}"))?;
     let manager = crate::camoufox_manager::CamoufoxManager::instance();
-    manager
-      .generate_fingerprint_config(&app_handle, &temp_profile, &config)
-      .await
-      .map_err(|e| format!("Failed to generate fingerprint: {e}"))
-  } else if browser == "wayfern" || browser == "chromium" {
-    let config: crate::wayfern_manager::ChromiumConfig =
-      serde_json::from_str(&config_json).map_err(|e| format!("Failed to parse config: {e}"))?;
-    let manager = crate::wayfern_manager::ChromiumManager::instance();
     manager
       .generate_fingerprint_config(&app_handle, &temp_profile, &config)
       .await
@@ -1559,13 +1534,6 @@ pub fn run() {
             log::warn!("Failed to refresh cloud sync token on startup: {e}");
           }
           cloud_auth::CLOUD_AUTH.sync_cloud_proxy().await;
-
-          // Request wayfern token on startup for paid users
-          if cloud_auth::CLOUD_AUTH.has_active_paid_subscription().await {
-            if let Err(e) = cloud_auth::CLOUD_AUTH.request_chromium_token().await {
-              log::warn!("Failed to request wayfern token on startup: {e}");
-            }
-          }
         }
         cloud_auth::CloudAuthManager::start_sync_token_refresh_loop(app_handle_cloud).await;
       });
@@ -1638,7 +1606,6 @@ pub fn run() {
       parse_txt_proxies,
       import_proxies_from_parsed,
       update_camoufox_config,
-      update_chromium_config,
       generate_sample_fingerprint,
       get_profile_groups,
       get_groups_with_profile_counts,
@@ -1689,9 +1656,6 @@ pub fn run() {
       copy_profile_cookies,
       import_cookies_from_file,
       export_profile_cookies,
-      check_chromium_terms_accepted,
-      check_chromium_downloaded,
-      accept_chromium_terms,
       get_commercial_trial_status,
       acknowledge_trial_expiration,
       has_acknowledged_trial_expiration,
@@ -1724,8 +1688,6 @@ pub fn run() {
       cloud_auth::cloud_get_isps,
       cloud_auth::create_cloud_location_proxy,
       cloud_auth::restart_sync_service,
-      cloud_auth::cloud_get_chromium_token,
-      cloud_auth::cloud_refresh_chromium_token,
       // Team lock commands
       team_lock::get_team_locks,
       team_lock::get_team_lock_status,
@@ -1778,8 +1740,6 @@ mod tests {
       "set_extension_group_sync_enabled",
       "get_team_lock_status",
       "generate_sample_fingerprint",
-      "cloud_get_chromium_token",
-      "cloud_refresh_chromium_token",
       "check_for_app_updates",
     ];
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChromiumConfigForm } from "@/components/chromium-config-form";
 import { SharedCamoufoxConfigForm } from "@/components/shared-camoufox-config-form";
 import {
   Dialog,
@@ -15,7 +14,6 @@ import type {
   BrowserProfile,
   CamoufoxConfig,
   CamoufoxOS,
-  ChromiumConfig,
 } from "@/types";
 
 const getCurrentOS = (): CamoufoxOS => {
@@ -51,8 +49,7 @@ export function CamoufoxConfigDialog({
   isRunning = false,
   crossOsUnlocked = false,
 }: CamoufoxConfigDialogProps) {
-  // Use union type to support both Camoufox and Chromium configs
-  const [config, setConfig] = useState<CamoufoxConfig | ChromiumConfig>(() => ({
+  const [config, setConfig] = useState<CamoufoxConfig>(() => ({
     geoip: true,
     os: getCurrentOS(),
   }));
@@ -64,12 +61,13 @@ export function CamoufoxConfigDialog({
   // Initialize config when profile changes
   useEffect(() => {
     if (profile && isAntiDetectBrowser) {
+      // For existing chromium profiles, read from chromium_config; otherwise camoufox_config
       const profileConfig =
         profile.browser === "chromium"
           ? profile.chromium_config
           : profile.camoufox_config;
       setConfig(
-        profileConfig || {
+        (profileConfig as CamoufoxConfig) || {
           geoip: true,
           os: getCurrentOS(),
         },
@@ -78,7 +76,7 @@ export function CamoufoxConfigDialog({
   }, [profile, isAntiDetectBrowser]);
 
   const updateConfig = (
-    key: keyof CamoufoxConfig | keyof ChromiumConfig,
+    key: keyof CamoufoxConfig,
     value: unknown,
   ) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -129,7 +127,7 @@ export function CamoufoxConfigDialog({
           ? profile.chromium_config
           : profile.camoufox_config;
       setConfig(
-        profileConfig || {
+        (profileConfig as CamoufoxConfig) || {
           geoip: true,
           os: getCurrentOS(),
         },
@@ -142,7 +140,8 @@ export function CamoufoxConfigDialog({
     return null;
   }
 
-  const browserName = profile.browser === "chromium" ? "Chromium" : "Camoufox";
+  // Always display as "Camoufox" in the UI, even for legacy chromium profiles
+  const browserName = "Camoufox";
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -156,30 +155,17 @@ export function CamoufoxConfigDialog({
 
         <ScrollArea className="flex-1 h-[300px]">
           <div className="py-4">
-            {profile.browser === "chromium" ? (
-              <ChromiumConfigForm
-                config={config as ChromiumConfig}
-                onConfigChange={updateConfig}
-                forceAdvanced={true}
-                readOnly={isRunning}
-                crossOsUnlocked={crossOsUnlocked}
-                limitedMode={!crossOsUnlocked}
-                profileVersion={profile.version}
-                profileBrowser="chromium"
-              />
-            ) : (
-              <SharedCamoufoxConfigForm
-                config={config as CamoufoxConfig}
-                onConfigChange={updateConfig}
-                forceAdvanced={true}
-                readOnly={isRunning}
-                browserType="camoufox"
-                crossOsUnlocked={crossOsUnlocked}
-                limitedMode={!crossOsUnlocked}
-                profileVersion={profile.version}
-                profileBrowser="camoufox"
-              />
-            )}
+            <SharedCamoufoxConfigForm
+              config={config as CamoufoxConfig}
+              onConfigChange={updateConfig}
+              forceAdvanced={true}
+              readOnly={isRunning}
+              browserType="camoufox"
+              crossOsUnlocked={crossOsUnlocked}
+              limitedMode={!crossOsUnlocked}
+              profileVersion={profile.version}
+              profileBrowser={profile.browser === "chromium" ? "chromium" : "camoufox"}
+            />
           </div>
         </ScrollArea>
 

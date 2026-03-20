@@ -21,7 +21,7 @@ use crate::group_manager::GROUP_MANAGER;
 use crate::profile::{BrowserProfile, ProfileManager};
 use crate::proxy_manager::PROXY_MANAGER;
 use crate::settings_manager::SettingsManager;
-use crate::wayfern_terms::ChromiumTermsManager;
+// Chromium support removed
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpTool {
@@ -116,12 +116,6 @@ impl McpServer {
   }
 
   pub async fn start(&self, app_handle: AppHandle) -> Result<u16, String> {
-    if !ChromiumTermsManager::instance().is_terms_accepted() {
-      return Err(
-        "Wayfern Terms and Conditions must be accepted before starting MCP server".to_string(),
-      );
-    }
-
     if self.is_running() {
       return Err("MCP server is already running".to_string());
     }
@@ -2749,28 +2743,10 @@ impl McpServer {
           "screen_min_height": config.screen_min_height,
         })
       }
-      "wayfern" | "chromium" => {
-        let config = profile
-          .chromium_config
-          .as_ref()
-          .cloned()
-          .unwrap_or_default();
-        serde_json::json!({
-          "browser": "wayfern",
-          "seed": config.seed,
-          "fingerprint": config.fingerprint,
-          "os": config.os,
-          "brand": config.brand,
-          "hardware_concurrency": config.hardware_concurrency,
-          "timezone": config.timezone,
-          "lang": config.lang,
-          "randomize_fingerprint_on_launch": config.randomize_fingerprint_on_launch,
-        })
-      }
       _ => {
         return Err(McpError {
           code: -32000,
-          message: "MCP only supports Wayfern and Camoufox profiles".to_string(),
+          message: "MCP only supports Camoufox profiles".to_string(),
         })
       }
     };
@@ -2865,33 +2841,10 @@ impl McpServer {
             message: format!("Failed to update camoufox config: {e}"),
           })?;
       }
-      "wayfern" | "chromium" => {
-        let mut config = profile
-          .chromium_config
-          .as_ref()
-          .cloned()
-          .unwrap_or_default();
-        if let Some(fp) = fingerprint {
-          config.fingerprint = Some(fp.to_string());
-        }
-        if let Some(os_val) = os {
-          config.os = Some(os_val.to_string());
-        }
-        if let Some(r) = randomize {
-          config.randomize_fingerprint_on_launch = Some(r);
-        }
-        ProfileManager::instance()
-          .update_chromium_config(app_handle.clone(), profile_id, config)
-          .await
-          .map_err(|e| McpError {
-            code: -32000,
-            message: format!("Failed to update wayfern config: {e}"),
-          })?;
-      }
       _ => {
         return Err(McpError {
           code: -32000,
-          message: "MCP only supports Wayfern and Camoufox profiles".to_string(),
+          message: "MCP only supports Camoufox profiles".to_string(),
         })
       }
     }

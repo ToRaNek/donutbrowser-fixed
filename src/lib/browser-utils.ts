@@ -4,7 +4,6 @@
  */
 
 import {
-  FaChrome,
   FaExclamationTriangle,
   FaFire,
   FaFirefox,
@@ -12,11 +11,12 @@ import {
 
 /**
  * Map internal browser names to display names
+ * Note: "chromium" kept for backward compat with existing profiles
  */
 export function getBrowserDisplayName(browserType: string): string {
   const browserNames: Record<string, string> = {
     camoufox: "Camoufox",
-    chromium: "Chromium",
+    chromium: "Camoufox", // Display existing chromium profiles as Camoufox in UI
   };
 
   return browserNames[browserType] || browserType;
@@ -32,7 +32,7 @@ export function getBrowserIcon(browserType: string) {
     case "camoufox":
       return FaFirefox; // Firefox-based anti-detect browser
     case "chromium":
-      return FaChrome; // Chromium-based anti-detect browser
+      return FaFirefox; // Display as Camoufox icon for existing chromium profiles
     default:
       // All other browsers get a warning icon
       return FaExclamationTriangle;

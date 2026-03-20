@@ -389,11 +389,8 @@ impl CamoufoxConfigBuilder {
       config.insert("fonts".to_string(), serde_json::json!(custom));
     }
 
-    // Add font spacing seed
-    config.insert(
-      "fonts:spacing_seed".to_string(),
-      serde_json::json!(rng.random_range(0..1_073_741_824u32)),
-    );
+    // Font spacing noise disabled — detectable by fingerprint.com as "Browser Tampering"
+    config.insert("fonts:spacing_seed".to_string(), serde_json::json!(0));
 
     // Build Firefox preferences
     let mut firefox_prefs = self.firefox_prefs;
@@ -438,12 +435,11 @@ impl CamoufoxConfigBuilder {
       }
     }
 
-    // Canvas anti-fingerprinting
-    config.insert(
-      "canvas:aaOffset".to_string(),
-      serde_json::json!(rng.random_range(-50..=50)),
-    );
-    config.insert("canvas:aaCapOffset".to_string(), serde_json::json!(true));
+    // Canvas anti-fingerprinting disabled — detectable noise triggers
+    // "Browser Tampering" on fingerprint.com and similar services.
+    // Raw GPU canvas output passes detection and is consistent per-device.
+    config.insert("canvas:aaOffset".to_string(), serde_json::json!(0));
+    config.insert("canvas:aaCapOffset".to_string(), serde_json::json!(false));
 
     // Add extra config (user-provided)
     for (key, value) in self.extra_config {

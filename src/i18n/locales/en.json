@@ -190,9 +190,9 @@
       "stopFollower": "Following actions of {{leaderName}}",
       "desyncedTooltip": "Synchronization failed at {{url}}",
       "paidFeature": "Synchronizer is a paid feature",
-      "chromiumOnly": "Only Chromium profiles can be synchronized",
+      "chromiumOnly": "No eligible profiles available for synchronization",
       "selectFollowers": "Select Follower Profiles",
-      "selectFollowersDesc": "Choose profiles that will mirror the actions of the leader profile. Only stopped Chromium profiles can be selected.",
+      "selectFollowersDesc": "Choose profiles that will mirror the actions of the leader profile. Only stopped profiles can be selected.",
       "leader": "Leader",
       "follower": "Follower",
       "startSession": "Start Sync Session",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Anti-Detect Browser",
       "description": "Choose a browser with anti-detection capabilities",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Camoufox",
       "badge": "Anti-Detect Browser"
     },
@@ -238,11 +238,11 @@
       "latestAvailable": "Latest version ({{version}}) is available",
       "latestDownloading": "Downloading version ({{version}})..."
     },
-    "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Powered by Fingerprint Chromium",
+    "chromiumLabel": "Camoufox",
+    "chromiumSubtitle": "Anti-detect browser",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Powered by Camoufox",
-    "camoufoxWarning": "Firefox (Camoufox) is maintained by a third-party organization. For production use, please use Chromium."
+    "camoufoxWarning": "Firefox (Camoufox) is maintained by a third-party organization."
   },
   "deleteDialog": {
     "title": "Delete Profile",
@@ -469,7 +469,7 @@
       }
     },
     "chromium": {
-      "title": "Chromium Configuration",
+      "title": "Browser Configuration",
       "fingerprint": {
         "title": "Fingerprint",
         "randomize": "Randomize on Launch",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "chromium": "Chromium"
+    "chromium": "Camoufox"
   },
   "fingerprint": {
     "crossOsWarning": "Spoofing fingerprint for a different operating system is less reliable because it is impossible to perfectly mimic all underlying components. Use with caution.",
@@ -799,9 +799,9 @@
     "extensionGroup": "Extension Group",
     "compatibility": {
       "label": "Compatibility",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Firefox",
-      "both": "Chromium & Firefox"
+      "both": "Camoufox & Firefox"
     },
     "selectedFile": "Selected file",
     "namePlaceholder": "Extension name",

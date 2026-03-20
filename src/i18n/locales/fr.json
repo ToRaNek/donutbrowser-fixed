@@ -190,9 +190,9 @@
       "stopFollower": "Suit les actions de {{leaderName}}",
       "desyncedTooltip": "La synchronisation a échoué à {{url}}",
       "paidFeature": "Le synchroniseur est une fonctionnalité payante",
-      "chromiumOnly": "Seuls les profils Chromium peuvent être synchronisés",
+      "chromiumOnly": "Aucun profil éligible disponible pour la synchronisation",
       "selectFollowers": "Sélectionner les profils suiveurs",
-      "selectFollowersDesc": "Choisissez les profils qui reproduiront les actions du profil leader. Seuls les profils Chromium arrêtés peuvent être sélectionnés.",
+      "selectFollowersDesc": "Choisissez les profils qui reproduiront les actions du profil leader. Seuls les profils arrêtés peuvent être sélectionnés.",
       "leader": "Leader",
       "follower": "Suiveur",
       "startSession": "Démarrer la session de synchronisation",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Navigateur anti-détection",
       "description": "Choisissez un navigateur avec des capacités anti-détection",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Camoufox",
       "badge": "Navigateur anti-détection"
     },
@@ -238,11 +238,11 @@
       "latestAvailable": "La dernière version ({{version}}) est disponible",
       "latestDownloading": "Téléchargement de la version ({{version}})..."
     },
-    "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Propulsé par Fingerprint Chromium",
+    "chromiumLabel": "Camoufox",
+    "chromiumSubtitle": "Navigateur anti-détection",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Propulsé par Camoufox",
-    "camoufoxWarning": "Firefox (Camoufox) est maintenu par une organisation tierce. Pour une utilisation en production, veuillez utiliser Chromium."
+    "camoufoxWarning": "Firefox (Camoufox) est maintenu par une organisation tierce."
   },
   "deleteDialog": {
     "title": "Supprimer le profil",
@@ -469,7 +469,7 @@
       }
     },
     "chromium": {
-      "title": "Configuration Chromium",
+      "title": "Configuration du navigateur",
       "fingerprint": {
         "title": "Empreinte digitale",
         "randomize": "Randomiser au lancement",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "chromium": "Chromium"
+    "chromium": "Camoufox"
   },
   "fingerprint": {
     "crossOsWarning": "L'usurpation d'empreinte pour un système d'exploitation différent est moins fiable car il est impossible d'imiter parfaitement tous les composants sous-jacents. À utiliser avec précaution.",
@@ -799,9 +799,9 @@
     "extensionGroup": "Groupe d'Extensions",
     "compatibility": {
       "label": "Compatibilité",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Firefox",
-      "both": "Chromium et Firefox"
+      "both": "Camoufox et Firefox"
     },
     "selectedFile": "Fichier sélectionné",
     "namePlaceholder": "Nom de l'extension",

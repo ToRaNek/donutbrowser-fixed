@@ -190,9 +190,9 @@
       "stopFollower": "Seguindo as ações de {{leaderName}}",
       "desyncedTooltip": "A sincronização falhou em {{url}}",
       "paidFeature": "O sincronizador é um recurso pago",
-      "chromiumOnly": "Apenas perfis Chromium podem ser sincronizados",
+      "chromiumOnly": "Nenhum perfil elegível disponível para sincronização",
       "selectFollowers": "Selecionar perfis seguidores",
-      "selectFollowersDesc": "Escolha os perfis que replicarão as ações do perfil líder. Apenas perfis Chromium parados podem ser selecionados.",
+      "selectFollowersDesc": "Escolha os perfis que replicarão as ações do perfil líder. Apenas perfis parados podem ser selecionados.",
       "leader": "Líder",
       "follower": "Seguidor",
       "startSession": "Iniciar sessão de sincronização",
@@ -211,7 +211,7 @@
     "antiDetect": {
       "title": "Navegador Anti-Detecção",
       "description": "Escolha um navegador com capacidades anti-detecção",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Camoufox",
       "badge": "Navegador Anti-Detecção"
     },
@@ -238,11 +238,11 @@
       "latestAvailable": "A versão mais recente ({{version}}) está disponível",
       "latestDownloading": "Baixando versão ({{version}})..."
     },
-    "chromiumLabel": "Chromium",
-    "chromiumSubtitle": "Desenvolvido com Fingerprint Chromium",
+    "chromiumLabel": "Camoufox",
+    "chromiumSubtitle": "Navegador anti-detecção",
     "firefoxLabel": "Firefox",
     "firefoxSubtitle": "Desenvolvido com Camoufox",
-    "camoufoxWarning": "O Firefox (Camoufox) é mantido por uma organização terceira. Para uso em produção, utilize o Chromium."
+    "camoufoxWarning": "O Firefox (Camoufox) é mantido por uma organização terceira."
   },
   "deleteDialog": {
     "title": "Excluir Perfil",
@@ -469,7 +469,7 @@
       }
     },
     "chromium": {
-      "title": "Configuração do Chromium",
+      "title": "Configuração do navegador",
       "fingerprint": {
         "title": "Impressão Digital",
         "randomize": "Aleatorizar ao Iniciar",
@@ -579,7 +579,7 @@
   },
   "browser": {
     "camoufox": "Camoufox",
-    "chromium": "Chromium"
+    "chromium": "Camoufox"
   },
   "fingerprint": {
     "crossOsWarning": "A falsificação de impressão digital para um sistema operacional diferente é menos confiável porque é impossível imitar perfeitamente todos os componentes subjacentes. Use com cautela.",
@@ -799,9 +799,9 @@
     "extensionGroup": "Grupo de Extensões",
     "compatibility": {
       "label": "Compatibilidade",
-      "chromium": "Chromium",
+      "chromium": "Camoufox",
       "firefox": "Firefox",
-      "both": "Chromium e Firefox"
+      "both": "Camoufox e Firefox"
     },
     "selectedFile": "Arquivo selecionado",
     "namePlaceholder": "Nome da extensão",

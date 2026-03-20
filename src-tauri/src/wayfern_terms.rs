@@ -3,10 +3,13 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command as TokioCommand;
 
-use crate::browser::{create_browser, BrowserType};
+// Chromium support removed - imports kept for backward compatibility
+#[allow(unused_imports)]
+use crate::browser::BrowserType;
 use crate::downloaded_browsers_registry::DownloadedBrowsersRegistry;
 use crate::profile::ProfileManager;
 
+#[allow(dead_code)]
 const ACCEPT_TERMS_FLAG: &str = "--accept-terms-and-conditions";
 const MIN_VALID_TIMESTAMP: i64 = 1577836800; // 2020-01-01 00:00:00 UTC
 
@@ -97,6 +100,7 @@ impl ChromiumTermsManager {
     timestamp >= MIN_VALID_TIMESTAMP
   }
 
+  #[allow(dead_code)]
   pub fn is_chromium_downloaded(&self) -> bool {
     let registry = DownloadedBrowsersRegistry::instance();
     let versions = registry.get_downloaded_versions("chromium");
@@ -108,6 +112,7 @@ impl ChromiumTermsManager {
     !legacy_versions.is_empty()
   }
 
+  #[allow(dead_code)]
   fn get_any_chromium_executable(&self) -> Option<PathBuf> {
     // First try to get executable from any downloaded Chromium version
     let registry = DownloadedBrowsersRegistry::instance();
@@ -132,10 +137,12 @@ impl ChromiumTermsManager {
     browser_dir.push(browser_key);
     browser_dir.push(version);
 
-    let browser = create_browser(BrowserType::Chromium);
-    browser.get_executable_path(&browser_dir).ok()
+    // Chromium support removed - this function always returns None
+    let _ = browser_dir;
+    None
   }
 
+  #[allow(dead_code)]
   pub async fn accept_terms(&self) -> Result<(), String> {
     let executable_path = self.get_any_chromium_executable().ok_or_else(|| {
       "No Wayfern browser downloaded. Please download a Wayfern browser version first.".to_string()
@@ -169,6 +176,7 @@ impl ChromiumTermsManager {
     self.run_accept_command(&executable_path).await
   }
 
+  #[allow(dead_code)]
   async fn run_accept_command(&self, executable_path: &PathBuf) -> Result<(), String> {
     let output = TokioCommand::new(executable_path)
       .arg(ACCEPT_TERMS_FLAG)
