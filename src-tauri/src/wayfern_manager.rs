@@ -254,6 +254,12 @@ impl ChromiumManager {
       "--disable-features=DialMediaRouteProvider".to_string(),
       "--use-mock-keychain".to_string(),
       "--password-store=basic".to_string(),
+      // Ensure WebGL works via SwiftShader software rendering (needed on headless/GPU-less environments).
+      // fingerprint-chromium bundles SwiftShader; these flags activate it for the ANGLE backend
+      // so that WebGL data is populated and canvas noise goes through the correct rendering path.
+      "--use-gl=angle".to_string(),
+      "--use-angle=swiftshader-webgl".to_string(),
+      "--enable-unsafe-swiftshader".to_string(),
     ];
 
     // Build fingerprint CLI args for fingerprint-chromium
@@ -290,6 +296,39 @@ impl ChromiumManager {
       args.push(format!("--proxy-server={proxy}"));
     }
 
+    // Resolve geolocation and pass via CLI arg (--fingerprint-location) instead of CDP.
+    // Using CDP Emulation.setGeolocationOverride on a page target leaves detectable traces
+    // that cause jsModifyDetected=true on fingerprint scanners. fingerprint-chromium supports
+    // native C++ geolocation spoofing via the --fingerprint-location CLI arg.
+    let geoip_option = config.geoip.as_ref();
+    let should_geolocate = !matches!(geoip_option, Some(serde_json::Value::Bool(false)));
+
+    if should_geolocate {
+      let geo_result = async {
+        let ip = match geoip_option {
+          Some(serde_json::Value::String(ip_str)) => ip_str.clone(),
+          _ => crate::ip_utils::fetch_public_ip(config.proxy.as_deref())
+            .await
+            .map_err(|e| format!("Failed to fetch public IP: {e}"))?,
+        };
+        crate::camoufox::geolocation::get_geolocation(&ip)
+          .map_err(|e| format!("Failed to get geolocation for IP {ip}: {e}"))
+      }
+      .await;
+
+      match geo_result {
+        Ok(geo) => {
+          let lat = geo.latitude;
+          let lng = geo.longitude;
+          args.push(format!("--fingerprint-location={lat},{lng}"));
+          log::info!("Set fingerprint geolocation via CLI: lat={lat}, lng={lng}");
+        }
+        Err(e) => {
+          log::warn!("Geolocation lookup failed, skipping location spoofing: {e}");
+        }
+      }
+    }
+
     if ephemeral {
       args.push("--disk-cache-size=1".to_string());
       args.push("--disable-breakpad".to_string());
@@ -316,54 +355,6 @@ impl ChromiumManager {
     let process_id = child.id();
 
     self.wait_for_cdp_ready(port).await?;
-
-    // Set geolocation override via CDP if geoip config is present
-    let geoip_option = config.geoip.as_ref();
-    let should_geolocate = !matches!(geoip_option, Some(serde_json::Value::Bool(false)));
-
-    if should_geolocate {
-      let geo_result = async {
-        let ip = match geoip_option {
-          Some(serde_json::Value::String(ip_str)) => ip_str.clone(),
-          _ => crate::ip_utils::fetch_public_ip(config.proxy.as_deref())
-            .await
-            .map_err(|e| format!("Failed to fetch public IP: {e}"))?,
-        };
-        crate::camoufox::geolocation::get_geolocation(&ip)
-          .map_err(|e| format!("Failed to get geolocation for IP {ip}: {e}"))
-      }
-      .await;
-
-      match geo_result {
-        Ok(geo) => {
-          let lat = geo.latitude;
-          let lng = geo.longitude;
-          let accuracy = geo.accuracy.unwrap_or(100.0);
-
-          let targets = self.get_cdp_targets(port).await;
-          if let Ok(targets) = targets {
-            if let Some(target) = targets
-              .iter()
-              .find(|t| t.target_type == "page" && t.websocket_debugger_url.is_some())
-            {
-              if let Some(ws_url) = &target.websocket_debugger_url {
-                let _ = self
-                  .send_cdp_command(
-                    ws_url,
-                    "Emulation.setGeolocationOverride",
-                    json!({ "latitude": lat, "longitude": lng, "accuracy": accuracy }),
-                  )
-                  .await;
-                log::info!("Set geolocation override: lat={lat}, lng={lng}");
-              }
-            }
-          }
-        }
-        Err(e) => {
-          log::warn!("Geolocation lookup failed, skipping override: {e}");
-        }
-      }
-    }
 
     let id = uuid::Uuid::new_v4().to_string();
     let instance = WayfernInstance {

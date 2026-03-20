@@ -698,13 +698,16 @@ impl Browser for ChromiumBrowser {
       "--hide-crash-restore-bubble".to_string(),
       "--disable-infobars".to_string(),
       "--disable-quic".to_string(),
-      // Wayfern-specific args for automation
       "--disable-features=DialMediaRouteProvider".to_string(),
       "--use-mock-keychain".to_string(),
       "--password-store=basic".to_string(),
+      // Ensure WebGL works via SwiftShader software rendering on GPU-less environments
+      "--use-gl=angle".to_string(),
+      "--use-angle=swiftshader-webgl".to_string(),
+      "--enable-unsafe-swiftshader".to_string(),
     ];
 
-    // Add remote debugging port (required for CDP fingerprint injection)
+    // Add remote debugging port
     if let Some(port) = remote_debugging_port {
       args.push("--remote-debugging-address=127.0.0.1".to_string());
       args.push(format!("--remote-debugging-port={port}"));
