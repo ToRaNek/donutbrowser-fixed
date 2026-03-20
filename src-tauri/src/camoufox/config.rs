@@ -312,15 +312,49 @@ impl CamoufoxConfigBuilder {
     let fingerprint = if let Some(fp) = self.fingerprint {
       fp
     } else {
-      let generator = crate::camoufox::fingerprint::FingerprintGenerator::new()?;
-      let options = FingerprintOptions {
-        operating_system: self.operating_system.clone(),
-        browsers: Some(vec!["firefox".to_string()]),
-        devices: Some(vec!["desktop".to_string()]),
-        screen: self.screen_constraints,
-        ..Default::default()
+      // Use fpgen (trained on 2.4M real sessions) for realistic fingerprints
+      let os_name = self.operating_system.as_deref().unwrap_or("windows");
+      let fpgen_platform = match os_name {
+        "macos" => "mac",
+        other => other,
       };
-      generator.get_fingerprint(&options)?.fingerprint
+
+      let fpgen_result = crate::fpgen::generate(Some(&crate::fpgen::FpgenOptions {
+        browser: Some("Firefox".into()),
+        platform: Some(fpgen_platform.into()),
+      }));
+
+      match fpgen_result {
+        Ok(fpgen_json) => {
+          let options = FingerprintOptions {
+            operating_system: self.operating_system.clone(),
+            browsers: Some(vec!["firefox".to_string()]),
+            devices: Some(vec!["desktop".to_string()]),
+            screen: self.screen_constraints.clone(),
+            ..Default::default()
+          };
+          match crate::fpgen::convert::to_fingerprint(&fpgen_json, &options) {
+            Ok(result) => {
+              log::info!("fpgen: generated fingerprint for {}", os_name);
+              result.fingerprint
+            }
+            Err(e) => {
+              log::warn!(
+                "fpgen conversion failed ({}), falling back to BrowserForge",
+                e
+              );
+              self.fallback_browserforge_fingerprint()?
+            }
+          }
+        }
+        Err(e) => {
+          log::warn!(
+            "fpgen generation failed ({}), falling back to BrowserForge",
+            e
+          );
+          self.fallback_browserforge_fingerprint()?
+        }
+      }
     };
 
     // Determine target OS from user agent
@@ -517,6 +551,19 @@ impl CamoufoxConfigBuilder {
     }
 
     Ok(launch_config)
+  }
+
+  /// Fallback: generate fingerprint using the old BrowserForge Bayesian networks.
+  fn fallback_browserforge_fingerprint(&self) -> Result<Fingerprint, ConfigError> {
+    let generator = crate::camoufox::fingerprint::FingerprintGenerator::new()?;
+    let options = FingerprintOptions {
+      operating_system: self.operating_system.clone(),
+      browsers: Some(vec!["firefox".to_string()]),
+      devices: Some(vec!["desktop".to_string()]),
+      screen: self.screen_constraints.clone(),
+      ..Default::default()
+    };
+    Ok(generator.get_fingerprint(&options)?.fingerprint)
   }
 }
 

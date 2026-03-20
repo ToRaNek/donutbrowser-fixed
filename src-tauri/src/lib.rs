@@ -25,6 +25,7 @@ mod ephemeral_dirs;
 mod extension_manager;
 mod extraction;
 mod fingerprint_data;
+pub mod fpgen;
 mod geoip_downloader;
 mod group_manager;
 mod human_typing;

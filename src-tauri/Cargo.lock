@@ -1803,6 +1803,7 @@ dependencies = [
  "winreg 0.56.0",
  "wiremock",
  "zip 8.2.0",
+ "zstd",
 ]
 
 [[package]]
