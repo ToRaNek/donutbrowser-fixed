@@ -66,9 +66,8 @@ use browser_runner::{
 
 use profile::manager::{
   check_browser_status, clone_profile, create_browser_profile_new, delete_profile,
-  list_browser_profiles, rename_profile, update_camoufox_config,
-  update_profile_note, update_profile_proxy, update_profile_proxy_bypass_rules,
-  update_profile_tags, update_profile_vpn,
+  list_browser_profiles, rename_profile, update_camoufox_config, update_profile_note,
+  update_profile_proxy, update_profile_proxy_bypass_rules, update_profile_tags, update_profile_vpn,
 };
 
 use browser_version_manager::{

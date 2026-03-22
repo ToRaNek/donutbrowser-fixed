@@ -845,6 +845,11 @@ impl Downloader {
       {
         log::warn!("Failed to create version.json for Camoufox: {e}");
       }
+
+      // Patch camoufox.cfg with anti-fingerprinting fixes
+      if let Err(e) = patch_camoufox_cfg(&browser_dir) {
+        log::warn!("Failed to patch camoufox.cfg: {e}");
+      }
     }
 
     // Emit completion
@@ -907,6 +912,177 @@ impl Downloader {
     Ok(version)
   }
 }
+
+/// Patch camoufox.cfg after download to add Donut Browser anti-fingerprinting fixes.
+/// This adds: navigator.plugins normalization, canvas/audio/font frame scripts,
+/// and the critical -apple-system-body cross-OS font fix.
+pub fn patch_camoufox_cfg(browser_dir: &Path) -> Result<(), String> {
+  let cfg_path = browser_dir.join("camoufox.cfg");
+  if !cfg_path.exists() {
+    return Err(format!("camoufox.cfg not found at {}", cfg_path.display()));
+  }
+
+  let content =
+    std::fs::read_to_string(&cfg_path).map_err(|e| format!("Failed to read camoufox.cfg: {e}"))?;
+
+  // Check if already patched
+  if content.contains("DONUT BROWSER: Fix navigator.plugins") {
+    log::info!("camoufox.cfg already patched, skipping");
+    return Ok(());
+  }
+
+  let patch = CAMOUFOX_CFG_PATCH;
+  let patched = format!("{content}\n{patch}\n");
+
+  std::fs::write(&cfg_path, patched)
+    .map_err(|e| format!("Failed to write patched camoufox.cfg: {e}"))?;
+
+  log::info!("Successfully patched camoufox.cfg with anti-fingerprinting fixes");
+  Ok(())
+}
+
+/// The JavaScript patch appended to camoufox.cfg after download.
+/// Contains: navigator.plugins fix, canvas/audio noise frame script,
+/// and -apple-system-body cross-OS font replacement.
+const CAMOUFOX_CFG_PATCH: &str = r#"
+// === DONUT BROWSER: Fix navigator.plugins ===
+// Camoufox hardcodes 5 PDF viewers (Chrome/Edge/WebKit) which is detectable.
+// Override to show only Firefox's "PDF Viewer" plugin.
+try {
+  const {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+  Services.obs.addObserver({
+    observe: function(subject, topic) {
+      let dominated = subject.QueryInterface(Ci.nsIDOMWindow);
+      try {
+        let script = `
+          Object.defineProperty(navigator, 'plugins', {
+            get: function() {
+              return {
+                0: {name: "PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format", length: 2, item: function(i){return this[i]||null;}, namedItem: function(n){return null;}, [Symbol.iterator]: function*(){yield {type:"application/pdf",suffixes:"pdf",description:"Portable Document Format"};yield {type:"text/pdf",suffixes:"pdf",description:"Portable Document Format"};}},
+                length: 1,
+                item: function(i){return this[i]||null;},
+                namedItem: function(n){if(n==="PDF Viewer")return this[0];return null;},
+                refresh: function(){},
+                [Symbol.iterator]: function*(){yield this[0];}
+              };
+            },
+            configurable: true
+          });
+        `;
+        dominated.eval(script);
+      } catch(e) {}
+    }
+  }, "content-document-global-created");
+} catch(e) {}
+
+// === DONUT BROWSER: Cross-platform normalization ===
+defaultPref("javascript.options.use_fdlibm_for_sin_cos_tan", true);
+
+// === DONUT BROWSER: Comprehensive hardware signal spoofing ===
+try {
+  let sessionSeed = (Date.now() % 100000) + Math.floor(Math.random() * 10000);
+  let mm = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
+  let frameScript = 'data:text/javascript,' + encodeURIComponent(`
+    addEventListener("DOMWindowCreated", function(e) {
+      let w = e.target.defaultView;
+      if (!w) return;
+      let seed = ${sessionSeed};
+
+      function mulberry32(a) {
+        return function() {
+          a |= 0; a = a + 0x6D2B79F5 | 0;
+          var t = Math.imul(a ^ a >>> 15, 1 | a);
+          t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+          return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+      }
+
+      // --- 1. Canvas fingerprint interception ---
+      try {
+        let origToDataURL = w.HTMLCanvasElement.prototype.toDataURL;
+        let origToBlob = w.HTMLCanvasElement.prototype.toBlob;
+        let origGetImageData = w.CanvasRenderingContext2D.prototype.getImageData;
+
+        function perturbCanvas(canvas) {
+          try {
+            let ctx = canvas.getContext("2d");
+            if (!ctx || canvas.width === 0 || canvas.height === 0) return;
+            let imgData = origGetImageData.call(ctx, 0, 0, canvas.width, canvas.height);
+            let d = imgData.data;
+            let rng = mulberry32(seed ^ (canvas.width * 31 + canvas.height));
+            for (let i = 0; i < d.length; i += 4) {
+              if (rng() < 0.02) {
+                let ch = (rng() * 3) | 0;
+                d[i + ch] = (d[i + ch] + (rng() < 0.5 ? -1 : 1) + 256) % 256;
+              }
+            }
+            ctx.putImageData(imgData, 0, 0);
+          } catch(ex) {}
+        }
+
+        w.HTMLCanvasElement.prototype.toDataURL = function() {
+          perturbCanvas(this);
+          return origToDataURL.apply(this, arguments);
+        };
+        w.HTMLCanvasElement.prototype.toBlob = function() {
+          perturbCanvas(this);
+          return origToBlob.apply(this, arguments);
+        };
+        w.CanvasRenderingContext2D.prototype.getImageData = function(sx, sy, sw, sh) {
+          let result = origGetImageData.call(this, sx, sy, sw, sh);
+          let d = result.data;
+          let rng = mulberry32(seed ^ (sw * 17 + sh));
+          for (let i = 0; i < d.length; i += 4) {
+            if (rng() < 0.01) {
+              let ch = (rng() * 3) | 0;
+              d[i + ch] = (d[i + ch] + (rng() < 0.5 ? -1 : 1) + 256) % 256;
+            }
+          }
+          return result;
+        };
+      } catch(ex) {}
+
+      // --- 2. Audio fingerprint interception ---
+      try {
+        if (w.AudioBuffer) {
+          let audioSeed = seed * 0.0000001;
+          let origGetChannelData = w.AudioBuffer.prototype.getChannelData;
+          w.AudioBuffer.prototype.getChannelData = function(channel) {
+            let data = origGetChannelData.call(this, channel);
+            if (this.length > 4500) {
+              for (let i = 4500; i < Math.min(data.length, 5000); i++) {
+                if (data[i] !== 0) data[i] += audioSeed;
+              }
+            }
+            return data;
+          };
+        }
+      } catch(ex) {}
+
+      // --- 3. -apple-system-body cross-OS fix ---
+      // Register @font-face mapping Apple system fonts to Trebuchet MS.
+      // Must use <style> injection (userContent.css / windowUtils don't work for @font-face).
+      try {
+        let appleCSS = '@font-face{font-family:-apple-system-body;src:local("Trebuchet MS")}@font-face{font-family:-apple-system;src:local("Trebuchet MS")}@font-face{font-family:BlinkMacSystemFont;src:local("Trebuchet MS")}';
+        let injectFonts = function() {
+          if (w.document && w.document.documentElement) {
+            let s = w.document.createElement('style');
+            s.textContent = appleCSS;
+            w.document.documentElement.appendChild(s);
+          }
+        };
+        if (w.document && w.document.documentElement) {
+          injectFonts();
+        } else {
+          w.addEventListener('DOMContentLoaded', injectFonts, {once: true});
+        }
+      } catch(ex) {}
+
+    }, true);
+  `);
+  mm.loadFrameScript(frameScript, true);
+} catch(e) {}
+"#;
 
 /// Check if a specific browser-version pair is currently being downloaded
 pub fn is_downloading(browser: &str, version: &str) -> bool {

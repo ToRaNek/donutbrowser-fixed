@@ -48,11 +48,7 @@ import { useProxyEvents } from "@/hooks/use-proxy-events";
 import { useVpnEvents } from "@/hooks/use-vpn-events";
 import { getBrowserIcon } from "@/lib/browser-utils";
 import { cn } from "@/lib/utils";
-import type {
-  BrowserReleaseTypes,
-  CamoufoxConfig,
-  CamoufoxOS,
-} from "@/types";
+import type { BrowserReleaseTypes, CamoufoxConfig, CamoufoxOS } from "@/types";
 
 const getCurrentOS = (): CamoufoxOS => {
   if (typeof navigator === "undefined") return "linux";
@@ -376,8 +372,7 @@ export function CreateProfileDialog({
           proxyId: resolvedProxyId,
           vpnId: resolvedVpnId,
           camoufoxConfig: finalCamoufoxConfig,
-          groupId:
-            selectedGroupId !== "default" ? selectedGroupId : undefined,
+          groupId: selectedGroupId !== "default" ? selectedGroupId : undefined,
           extensionGroupId: selectedExtensionGroupId,
           ephemeral,
         });

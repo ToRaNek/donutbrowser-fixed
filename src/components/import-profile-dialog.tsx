@@ -32,7 +32,7 @@ import { getBrowserDisplayName, getBrowserIcon } from "@/lib/browser-utils";
 import type { CamoufoxConfig, DetectedProfile } from "@/types";
 import { RippleButton } from "./ui/ripple";
 
-const getMappedBrowser = (_browser: string): "camoufox" => {
+const _getMappedBrowser = (_browser: string): "camoufox" => {
   // All imported profiles now default to Camoufox
   return "camoufox";
 };
@@ -206,7 +206,6 @@ export function ImportProfileDialog({
     selectedProxyId,
     camoufoxConfig,
     onClose,
-    selectedProfile,
   ]);
 
   const handleClose = () => {

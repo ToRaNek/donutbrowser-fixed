@@ -61,7 +61,7 @@ export function IntegrationsDialog({
   const [isMcpStarting, setIsMcpStarting] = useState(false);
 
   // Terms always accepted - no chromium terms check needed
-  const termsAccepted = true;
+  const _termsAccepted = true;
 
   const loadSettings = useCallback(async () => {
     try {

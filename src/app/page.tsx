@@ -738,9 +738,7 @@ export default function Home() {
         (p.browser === "chromium" || p.browser === "camoufox"),
     );
     if (eligibleProfiles.length === 0) {
-      showErrorToast(
-        "Cookie copy only works with Camoufox profiles",
-      );
+      showErrorToast("Cookie copy only works with Camoufox profiles");
       return;
     }
     setSelectedProfilesForCookies(eligibleProfiles.map((p) => p.id));

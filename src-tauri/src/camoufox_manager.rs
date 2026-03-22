@@ -247,9 +247,51 @@ impl CamoufoxManager {
     };
 
     // Parse the fingerprint config JSON
-    let fingerprint_config: HashMap<String, serde_json::Value> =
+    let mut fingerprint_config: HashMap<String, serde_json::Value> =
       serde_json::from_str(&custom_config)
         .map_err(|e| format!("Failed to parse fingerprint config: {e}"))?;
+
+    // Per-profile uniqueness signals (canvas:aaOffset, fonts:spacing_seed,
+    // window dimensions, WebGL) are now set during profile creation in
+    // config.rs build().  For profiles created before this change, backfill
+    // any missing values so they still get unique fingerprints.
+    if !fingerprint_config.contains_key("canvas:aaOffset") {
+      let aa_offset: i32 = (rand::random::<u32>() % 101) as i32 - 50;
+      fingerprint_config.insert("canvas:aaOffset".to_string(), serde_json::json!(aa_offset));
+      fingerprint_config.insert("canvas:aaCapOffset".to_string(), serde_json::json!(true));
+      log::info!("Backfilled missing canvas:aaOffset={aa_offset} for legacy profile");
+    }
+    if !fingerprint_config.contains_key("fonts:spacing_seed") {
+      let spacing_seed: u32 = rand::random::<u32>() % 1_073_741_824;
+      fingerprint_config.insert(
+        "fonts:spacing_seed".to_string(),
+        serde_json::json!(spacing_seed),
+      );
+      log::info!("Backfilled missing fonts:spacing_seed for legacy profile");
+    }
+    if !fingerprint_config.contains_key("window.innerWidth") {
+      if let Some(sw) = fingerprint_config
+        .get("screen.width")
+        .and_then(|v| v.as_i64())
+      {
+        let inner_w = sw - (rand::random::<u32>() % 20) as i64;
+        let inner_h = if let Some(sh) = fingerprint_config
+          .get("screen.height")
+          .and_then(|v| v.as_i64())
+        {
+          sh - 71 - (rand::random::<u32>() % 30) as i64
+        } else {
+          969
+        };
+        let outer_w = inner_w;
+        let outer_h = inner_h + 71;
+        fingerprint_config.insert("window.innerWidth".to_string(), serde_json::json!(inner_w));
+        fingerprint_config.insert("window.innerHeight".to_string(), serde_json::json!(inner_h));
+        fingerprint_config.insert("window.outerWidth".to_string(), serde_json::json!(outer_w));
+        fingerprint_config.insert("window.outerHeight".to_string(), serde_json::json!(outer_h));
+        log::info!("Backfilled missing window dimensions for legacy profile");
+      }
+    }
 
     // Convert to environment variables using CAMOU_CONFIG chunking
     let env_vars = crate::camoufox::env_vars::config_to_env_vars(&fingerprint_config)
@@ -280,6 +322,124 @@ impl CamoufoxManager {
     // Add headless flag for tests
     if std::env::var("CAMOUFOX_HEADLESS").is_ok() {
       args.push("--headless".to_string());
+    }
+
+    // Write anti-tampering prefs to user.js before launch.
+    // These override Playwright/Camoufox defaults that cause fingerprint.com detection.
+    let profile_dir = std::path::Path::new(profile_path)
+      .canonicalize()
+      .unwrap_or_else(|_| std::path::Path::new(profile_path).to_path_buf());
+    let user_js_path = profile_dir.join("user.js");
+
+    // Determine if cross-OS spoofing (e.g. claiming macOS while running on Windows).
+    // When cross-OS, CSS system colors (ButtonFace, Canvas, etc.) leak the real OS,
+    // so we enable standins to hide the mismatch.
+    let host_os = if cfg!(target_os = "windows") {
+      "windows"
+    } else if cfg!(target_os = "macos") {
+      "macos"
+    } else {
+      "linux"
+    };
+    let target_os_for_prefs = config.os.as_deref().unwrap_or(host_os);
+    let is_cross_os =
+      target_os_for_prefs != host_os && target_os_for_prefs != "windows" && host_os == "windows";
+    let standins_value = if is_cross_os { "true" } else { "false" };
+
+    let anti_tamper_prefs = format!(
+      "// Donut Browser anti-tampering overrides\n\
+       user_pref(\"ui.use_standins_for_native_colors\", {standins_value});\n\
+       user_pref(\"gfx.color_management.mode\", 2);\n\
+       user_pref(\"gfx.color_management.rendering_intent\", 0);\n\
+       user_pref(\"focusmanager.testmode\", false);\n\
+       user_pref(\"toolkit.cosmeticAnimations.enabled\", true);\n\
+       user_pref(\"dom.input_events.security.minNumTicks\", 5);\n\
+       user_pref(\"dom.input_events.security.minTimeElapsedInMS\", 100);\n\
+       user_pref(\"dom.iframe_lazy_loading.enabled\", true);\n\
+       user_pref(\"browser.cache.memory.enable\", true);\n\
+       user_pref(\"privacy.partition.network_state\", true);\n\
+       user_pref(\"network.dns.disablePrefetch\", false);\n\
+       user_pref(\"network.dns.disablePrefetchFromHTTPS\", false);\n\
+       user_pref(\"toolkit.legacyUserProfileCustomizations.stylesheets\", true);\n\
+       user_pref(\"javascript.options.use_fdlibm_for_sin_cos_tan\", true);\n\
+       user_pref(\"webgl.sanitize-unmasked-renderer\", false);\n\
+       user_pref(\"geo.provider.testing\", false);\n"
+    );
+    // Read existing user.js and append our prefs if not already present
+    let existing = std::fs::read_to_string(&user_js_path).unwrap_or_default();
+    if !existing.contains("anti-tampering overrides") {
+      let new_content = format!("{existing}\n{anti_tamper_prefs}");
+      if let Err(e) = std::fs::write(&user_js_path, new_content) {
+        log::warn!("Failed to write anti-tampering user.js: {e}");
+      }
+    }
+
+    // Write userContent.css to hide host-OS fonts via @font-face shadow rules.
+    // This makes Windows-only fonts (HELV, Small Fonts, etc.) invisible to
+    // CSS font-family detection used by fingerprint.com. The @font-face rule
+    // shadows the system font name but provides no valid source, so the browser
+    // falls through to the fallback font, making offsetWidth equal to baseline.
+    if cfg!(target_os = "windows") {
+      let target_os = config.os.as_deref().unwrap_or("macos");
+      log::info!(
+        "Font hiding: target_os={target_os}, config.os={:?}",
+        config.os
+      );
+      if target_os != "windows" {
+        let chrome_dir = profile_dir.join("chrome");
+        let _ = std::fs::create_dir_all(&chrome_dir);
+        let user_content_css = chrome_dir.join("userContent.css");
+        {
+          let css = concat!(
+            "/* Donut Browser: cross-OS font spoofing */\n",
+            "/* Map Apple-specific font keywords to Trebuchet MS so width differs from default */\n",
+            "@font-face { font-family: -apple-system-body; src: local(\"Trebuchet MS\"); }\n",
+            "@font-face { font-family: -apple-system; src: local(\"Trebuchet MS\"); }\n",
+            "@font-face { font-family: BlinkMacSystemFont; src: local(\"Trebuchet MS\"); }\n",
+            "/* Hide Windows-only fonts */\n",
+            "@font-face { font-family: \"HELV\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Small Fonts\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Segoe UI\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Calibri\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Cambria\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Consolas\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Constantia\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Corbel\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Ebrima\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Franklin Gothic Medium\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Gabriola\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Gadugi\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Ink Free\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Javanese Text\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Leelawadee UI\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Lucida Console\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"MS Gothic\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"MS PGothic\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Malgun Gothic\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Microsoft YaHei\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Nirmala UI\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Segoe UI Emoji\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Segoe UI Symbol\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"SimSun\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Yu Gothic\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Webdings\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Wingdings\"; src: local(\"_\"); }\n",
+            "@font-face { font-family: \"Marlett\"; src: local(\"_\"); }\n",
+          );
+          if let Err(e) = std::fs::write(&user_content_css, css) {
+            log::warn!("Failed to write userContent.css for font hiding: {e}");
+          } else {
+            log::info!("Wrote font-hiding userContent.css for cross-OS profile");
+          }
+        }
+      }
+    }
+
+    // Ensure camoufox.cfg is patched with anti-fingerprinting fixes
+    if let Some(parent) = executable_path.parent() {
+      if let Err(e) = crate::downloader::patch_camoufox_cfg(parent) {
+        log::warn!("Could not patch camoufox.cfg: {e}");
+      }
     }
 
     log::info!(

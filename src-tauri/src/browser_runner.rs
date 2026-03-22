@@ -1118,7 +1118,6 @@ impl BrowserRunner {
       return Ok(());
     }
 
-
     // For non-camoufox/wayfern browsers, use the existing logic
     let pid = if let Some(pid) = profile.process_id {
       // First verify the stored PID is still valid and belongs to our profile

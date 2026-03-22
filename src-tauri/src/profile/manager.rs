@@ -1348,7 +1348,6 @@ impl ProfileManager {
     Ok(false)
   }
 
-
   fn get_common_firefox_preferences(&self) -> Vec<String> {
     vec![
       // Disable default browser check
@@ -1871,9 +1870,7 @@ pub async fn create_browser_profile_new(
   group_id: Option<String>,
   ephemeral: Option<bool>,
 ) -> Result<BrowserProfile, String> {
-  let fingerprint_os = camoufox_config
-    .as_ref()
-    .and_then(|c| c.os.as_deref());
+  let fingerprint_os = camoufox_config.as_ref().and_then(|c| c.os.as_deref());
 
   if !crate::cloud_auth::CLOUD_AUTH
     .is_fingerprint_os_allowed(fingerprint_os)
@@ -1927,8 +1924,6 @@ pub async fn update_camoufox_config(
     .await
     .map_err(|e| format!("Failed to update Camoufox config: {e}"))
 }
-
-
 
 #[tauri::command]
 pub fn clone_profile(profile_id: String, name: Option<String>) -> Result<BrowserProfile, String> {

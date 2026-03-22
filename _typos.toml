@@ -7,9 +7,14 @@ extend-exclude = [
     "src-tauri/tests/fixtures/test.ovpn",
     "src-tauri/src/fingerprint_data/injection.rs",
     "src-tauri/extensions/**/*.js",
+    "fp_env*.sh",
+    "fp_config.json",
 ]
 
 [default.extend-words]
 DBE = "DBE"
 nd = "nd"
 ot = "ot"
+Sur = "Sur"
+lod = "lod"
+Sistem = "Sistem"

@@ -1,6 +1,7 @@
 //! Convert fpgen JSON output to DonutBrowser's `Fingerprint` type.
 
 use crate::camoufox::fingerprint::types::*;
+use rand::RngExt;
 use std::collections::HashMap;
 
 /// Convert an fpgen-generated JSON fingerprint into the DonutBrowser `Fingerprint` struct.
@@ -12,13 +13,54 @@ pub fn to_fingerprint(
     .as_object()
     .ok_or("fpgen output is not a JSON object")?;
 
+  let mut rng = rand::rng();
+
   // --- Screen ---
   let screen_obj = obj.get("screen").and_then(|v| v.as_object());
+  let screen_width = get_u32(screen_obj, "width", 1920);
+  let screen_height = get_u32(screen_obj, "height", 1080);
+  let avail_height = get_u32(screen_obj, "availHeight", screen_height.saturating_sub(40));
+
+  // Derive inner/outer dimensions from the actual screen size with random variation.
+  // fpgen's Bayesian network often does not include innerWidth/innerHeight for Firefox,
+  // causing all profiles to get the same hardcoded defaults. Instead we compute
+  // realistic values from the sampled screen dimensions.
+  let has_inner_width = screen_obj
+    .and_then(|s| s.get("innerWidth"))
+    .and_then(|v| v.as_u64())
+    .is_some();
+
+  let (inner_width, inner_height, outer_width, outer_height) = if has_inner_width {
+    // fpgen provided explicit values — use them
+    (
+      get_u32(screen_obj, "innerWidth", screen_width),
+      get_u32(screen_obj, "innerHeight", avail_height.saturating_sub(71)),
+      get_u32(screen_obj, "outerWidth", screen_width),
+      get_u32(screen_obj, "outerHeight", avail_height),
+    )
+  } else {
+    // Derive realistic window dimensions from screen size.
+    // Real users have varying window sizes — some maximized, some not.
+    // The chrome (title bar + toolbars) height is typically 71-111 px in Firefox.
+    let chrome_height = rng.random_range(71u32..=111);
+    // Width offset: 0 means maximized, otherwise the window is slightly narrower.
+    let width_offset = if rng.random_range(0u32..=100) < 40 {
+      0 // 40% chance of maximized width
+    } else {
+      rng.random_range(0u32..=120) // random reduction up to 120px
+    };
+    let ow = screen_width.saturating_sub(width_offset);
+    let oh = avail_height; // outer height typically matches avail_height
+    let iw = ow;
+    let ih = oh.saturating_sub(chrome_height);
+    (iw, ih, ow, oh)
+  };
+
   let screen = ScreenFingerprint {
-    width: get_u32(screen_obj, "width", 1920),
-    height: get_u32(screen_obj, "height", 1080),
-    avail_width: get_u32(screen_obj, "availWidth", 1920),
-    avail_height: get_u32(screen_obj, "availHeight", 1040),
+    width: screen_width,
+    height: screen_height,
+    avail_width: get_u32(screen_obj, "availWidth", screen_width),
+    avail_height,
     avail_top: get_u32(screen_obj, "availTop", 0),
     avail_left: get_u32(screen_obj, "availLeft", 0),
     color_depth: get_u32(screen_obj, "colorDepth", 24),
@@ -27,10 +69,10 @@ pub fn to_fingerprint(
       .and_then(|s| s.get("devicePixelRatio"))
       .and_then(|v| v.as_f64())
       .unwrap_or(1.0),
-    inner_width: get_u32(screen_obj, "innerWidth", 1920),
-    inner_height: get_u32(screen_obj, "innerHeight", 969),
-    outer_width: get_u32(screen_obj, "outerWidth", 1920),
-    outer_height: get_u32(screen_obj, "outerHeight", 1040),
+    inner_width,
+    inner_height,
+    outer_width,
+    outer_height,
     ..Default::default()
   };
 

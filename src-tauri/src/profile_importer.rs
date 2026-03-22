@@ -623,7 +623,6 @@ impl ProfileImporter {
       None
     };
 
-
     let profile = BrowserProfile {
       id: profile_id,
       name: new_profile_name.to_string(),
@@ -725,9 +724,7 @@ pub async fn import_browser_profile(
   camoufox_config: Option<CamoufoxConfig>,
   chromium_config: Option<serde_json::Value>,
 ) -> Result<(), String> {
-  let fingerprint_os = camoufox_config
-    .as_ref()
-    .and_then(|c| c.os.as_deref());
+  let fingerprint_os = camoufox_config.as_ref().and_then(|c| c.os.as_deref());
 
   if !crate::cloud_auth::CLOUD_AUTH
     .is_fingerprint_os_allowed(fingerprint_os)
